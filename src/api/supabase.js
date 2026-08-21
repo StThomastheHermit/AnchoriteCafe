@@ -46,6 +46,7 @@ export async function apiPost(payload) {
   if (payload.action === "analytics") return getAnalytics(payload.pin, payload.weekOffset);
   if (payload.action === "finance") return getFinance(payload.pin);
   if (payload.action === "saveFinance") return saveFinance(payload.pin, payload.items);
+  if (payload.action === "saveTheme") return saveTheme(payload.pin, payload.theme);
   if (payload.action === "timeClock") return timeClock(payload.employeePin);
   if (payload.action === "timeClockAdmin") return getTimeClockAdmin(payload.pin);
   if (payload.action === "saveEmployee") return saveEmployee(payload.pin, payload.employee);
@@ -291,6 +292,17 @@ export async function saveFinance(pin, items) {
     return await callRpc("arise_save_finance", {
       input_pin: String(pin || ""),
       input_items: Array.isArray(items) ? items : [],
+    });
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) };
+  }
+}
+
+export async function saveTheme(pin, theme) {
+  try {
+    return await callRpc("arise_save_theme", {
+      input_pin: String(pin || ""),
+      input_theme: theme && typeof theme === "object" ? theme : {},
     });
   } catch (error) {
     return { ok: false, error: errorMessage(error) };

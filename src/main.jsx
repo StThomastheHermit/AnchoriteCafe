@@ -57,6 +57,40 @@ const JUICE_OPTIONS = [
 ];
 const MAX_SYRUPS = 2;
 const MAX_REFRESHER_TOPPINGS = 3;
+const THEME_FIELDS = [
+  { key: "bg", label: "Background" },
+  { key: "surface", label: "Panels" },
+  { key: "surface2", label: "Raised panels" },
+  { key: "text", label: "Text" },
+  { key: "muted", label: "Soft text" },
+  { key: "gold", label: "Gold / tan" },
+  { key: "red", label: "Red" },
+  { key: "green", label: "Off green" },
+  { key: "copper", label: "Copper" },
+];
+const THEME_PRESETS = [
+  {
+    id: "anchorite",
+    label: "Anchorite",
+    colors: { bg: "#0B0604", surface: "#32180D", surface2: "#4A2415", text: "#FFF7EA", muted: "#E5C6A1", gold: "#E7A94C", red: "#D84A38", green: "#A9BC75", copper: "#B7642C" },
+  },
+  {
+    id: "bright",
+    label: "Vibrant",
+    colors: { bg: "#120604", surface: "#4A1F12", surface2: "#6A2E1B", text: "#FFF8EC", muted: "#F0CDA3", gold: "#F5B544", red: "#E4573F", green: "#B7C978", copper: "#D07832" },
+  },
+  {
+    id: "chapel",
+    label: "Chapel",
+    colors: { bg: "#070605", surface: "#25150F", surface2: "#3B2419", text: "#FFF4E2", muted: "#D9C09D", gold: "#D8A867", red: "#A93D31", green: "#879B68", copper: "#9D5A2B" },
+  },
+  {
+    id: "olive",
+    label: "Olive",
+    colors: { bg: "#090805", surface: "#2B2114", surface2: "#43351F", text: "#FFF8E9", muted: "#DDC99E", gold: "#D9A441", red: "#B94736", green: "#BBC878", copper: "#AA6430" },
+  },
+];
+const DEFAULT_THEME = THEME_PRESETS[0].colors;
 
 function makeDrinkId(label) {
   const base = String(label || "")
@@ -138,6 +172,33 @@ function formatCount(amount) {
 
 function formatCurrency(amount) {
   return `$${Number(amount || 0).toFixed(2)}`;
+}
+
+function normalizeTheme(theme) {
+  const source = theme && typeof theme === "object" ? theme : {};
+  return THEME_FIELDS.reduce((next, field) => {
+    const value = String(source[field.key] || DEFAULT_THEME[field.key] || "").trim();
+    next[field.key] = /^#[0-9a-fA-F]{6}$/.test(value) ? value : DEFAULT_THEME[field.key];
+    return next;
+  }, {});
+}
+
+function applyTheme(theme) {
+  if (typeof document === "undefined") return;
+  const colors = normalizeTheme(theme);
+  const root = document.documentElement;
+  root.style.setProperty("--bg", colors.bg);
+  root.style.setProperty("--bg-2", colors.bg);
+  root.style.setProperty("--surface", colors.surface);
+  root.style.setProperty("--surface-2", colors.surface2);
+  root.style.setProperty("--text", colors.text);
+  root.style.setProperty("--muted", colors.muted);
+  root.style.setProperty("--dim", colors.muted);
+  root.style.setProperty("--gold", colors.gold);
+  root.style.setProperty("--gold-2", colors.red);
+  root.style.setProperty("--green", colors.green);
+  root.style.setProperty("--red", colors.red);
+  root.style.setProperty("--copper", colors.copper);
 }
 
 function normalizeMenuDrinks(drinks, includeInactive = false) {
@@ -500,6 +561,8 @@ function AdminPage() {
   const [finance, setFinance] = useState({ items: [], totals: [] });
   const [financeLoaded, setFinanceLoaded] = useState(false);
   const [financeBusy, setFinanceBusy] = useState(false);
+  const [theme, setTheme] = useState(() => normalizeTheme());
+  const [themeBusy, setThemeBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [timeClock, setTimeClock] = useState({ employees: [], entries: [], totals: [] });
   const [timeClockLoaded, setTimeClockLoaded] = useState(false);
@@ -533,6 +596,17 @@ function AdminPage() {
   const clockedInEmployees = useMemo(() => (timeClock.totals || []).filter(total => total.clockedIn), [timeClock]);
   const openShiftEntries = useMemo(() => (timeClock.entries || []).filter(entry => !entry.clockOut), [timeClock]);
 
+  useEffect(() => {
+    applyTheme(theme);
+  }, []);
+
+  function syncTheme(nextTheme) {
+    if (!nextTheme) return;
+    const normalized = normalizeTheme(nextTheme);
+    setTheme(normalized);
+    applyTheme(normalized);
+  }
+
   function syncAdminMessage(nextMessage) {
     if (!messageEditingRef.current && typeof nextMessage === "string") {
       setMessage(nextMessage || "");
@@ -548,6 +622,7 @@ function AdminPage() {
         setOrders(data.orders || []);
         if (typeof data.isOpen === "boolean") setIsOpen(Boolean(data.isOpen));
         syncAdminMessage(data.message);
+        syncTheme(data.theme);
         setLastUpdated(new Date());
         setConnectionOk(true);
       } else {
@@ -568,6 +643,7 @@ function AdminPage() {
       if (data.ok) {
         if (typeof data.isOpen === "boolean") setIsOpen(Boolean(data.isOpen));
         syncAdminMessage(data.message);
+        syncTheme(data.theme);
         setLastUpdated(new Date());
         setConnectionOk(true);
       } else {
@@ -906,6 +982,31 @@ function AdminPage() {
     if (!isOwner) return;
     setAdminView("timeclock");
     if (!timeClockLoaded) await loadTimeClock();
+  }
+
+  function openThemeScreen() {
+    if (!isOwner) return;
+    setAdminView("theme");
+  }
+
+  async function saveTheme(nextTheme = theme) {
+    if (!isOwner) return;
+    const normalized = normalizeTheme(nextTheme);
+    setThemeBusy(true);
+    applyTheme(normalized);
+    try {
+      const data = await apiPost({ action: "saveTheme", pin, theme: normalized });
+      if (data.ok) {
+        syncTheme(data.theme || normalized);
+        setNotice("Theme saved");
+      } else {
+        alert(data.error || "Could not save theme");
+      }
+    } catch {
+      alert("Connection error");
+    } finally {
+      setThemeBusy(false);
+    }
   }
 
   function openStaffClock() {
@@ -1397,6 +1498,47 @@ function AdminPage() {
     );
   }
 
+  if (adminView === "theme") {
+    return (
+      <>
+        <Header isOpen={isOpen} />
+        <main className="adminPage">
+          <section className="adminTop">
+            <div>
+              <h2>Theme</h2>
+              <p className="sub">Choose a preset or adjust the app colors.</p>
+            </div>
+            <div className="adminTopActions">
+              <button className="primaryBtn compactPrimary" disabled={themeBusy} onClick={() => saveTheme()}>{themeBusy ? "Saving..." : "Save theme"}</button>
+              <button className="ghostBtn" onClick={() => setAdminView("dashboard")}>Back to dashboard</button>
+            </div>
+          </section>
+
+          <ThemeEditor
+            theme={theme}
+            busy={themeBusy}
+            onChange={nextTheme => {
+              const normalized = normalizeTheme(nextTheme);
+              setTheme(normalized);
+              applyTheme(normalized);
+            }}
+            onPreset={preset => {
+              const normalized = normalizeTheme(preset.colors);
+              setTheme(normalized);
+              applyTheme(normalized);
+            }}
+            onReset={() => {
+              const normalized = normalizeTheme(DEFAULT_THEME);
+              setTheme(normalized);
+              applyTheme(normalized);
+            }}
+            onSave={saveTheme}
+          />
+        </main>
+      </>
+    );
+  }
+
   if (adminView === "timeclock") {
     const totalsByEmployee = Object.fromEntries((timeClock.totals || []).map(total => [total.employeeId, total]));
     return (
@@ -1546,6 +1688,10 @@ function AdminPage() {
             <strong>Finance</strong>
             <span>Supply counts</span>
           </button>}
+          {isOwner && <button className={adminView === "theme" ? "toolTile active" : "toolTile"} onClick={openThemeScreen}>
+            <strong>Theme</strong>
+            <span>Colors and presets</span>
+          </button>}
           {isOwner && <button className={adminView === "timeclock" ? "toolTile active" : "toolTile"} onClick={openTimeClockScreen}>
             <strong>Time Clock</strong>
             <span>Employee hours</span>
@@ -1680,6 +1826,71 @@ function AdminPage() {
         </section>
       </main>
     </>
+  );
+}
+
+function ThemeEditor({ theme, busy, onChange, onPreset, onReset, onSave }) {
+  const colors = normalizeTheme(theme);
+
+  function updateColor(key, value) {
+    onChange({ ...colors, [key]: value });
+  }
+
+  return (
+    <section className="themePanel">
+      <div className="themePreview">
+        <div>
+          <span className="label">Live preview</span>
+          <h2>Anchorite Cafe</h2>
+          <p>Faith fueled soul rooted</p>
+        </div>
+        <button className="joinBtn" type="button">Go to Zelle</button>
+      </div>
+
+      <div className="themeSection">
+        <div className="menuSubhead">
+          <div>
+            <h3>Presets</h3>
+            <p>Start with one, then fine tune below.</p>
+          </div>
+        </div>
+        <div className="themePresetGrid">
+          {THEME_PRESETS.map(preset => (
+            <button className="themePreset" key={preset.id} type="button" disabled={busy} onClick={() => onPreset(preset)}>
+              <span>{preset.label}</span>
+              <div>
+                {["red", "gold", "green", "surface"].map(key => <i key={key} style={{ backgroundColor: preset.colors[key] }} />)}
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="themeSection">
+        <div className="menuSubhead">
+          <div>
+            <h3>Color Wheels</h3>
+            <p>Saved colors apply to the customer app, admin, clock, and menu.</p>
+          </div>
+        </div>
+        <div className="themeColorGrid">
+          {THEME_FIELDS.map(field => (
+            <label className="themeColorField" key={field.key}>
+              <span>{field.label}</span>
+              <div>
+                <input type="color" value={colors[field.key]} disabled={busy} onChange={event => updateColor(field.key, event.target.value)} />
+                <input value={colors[field.key]} disabled={busy} onChange={event => updateColor(field.key, event.target.value)} />
+              </div>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div className="themeActions">
+        <button className="ghostBtn" type="button" disabled={busy} onClick={onReset}>Reset</button>
+        <button className="primaryBtn compactPrimary" type="button" disabled={busy} onClick={() => onSave(colors)}>{busy ? "Saving..." : "Save theme"}</button>
+      </div>
+    </section>
   );
 }
 
@@ -2061,6 +2272,14 @@ function CustomerPage() {
   const pushDeviceHint = useMemo(() => getPushDeviceHint(), []);
   const requiresIosInstall = useMemo(() => isAppleTouchDevice() && !isStandaloneApp(), []);
 
+  useEffect(() => {
+    applyTheme(DEFAULT_THEME);
+  }, []);
+
+  function syncTheme(nextTheme) {
+    if (nextTheme) applyTheme(nextTheme);
+  }
+
   function updateTextSize(nextLargeText) {
     setLargeText(nextLargeText);
     localStorage.setItem(TEXT_SIZE_KEY, nextLargeText ? "large" : "normal");
@@ -2099,6 +2318,7 @@ function CustomerPage() {
       if (data.ok === false) return;
       if (typeof data.isOpen === "boolean") setIsOpen(Boolean(data.isOpen));
       if (typeof data.message === "string") setMessage(data.message || "");
+      syncTheme(data.theme);
       if (data.inventory) setInventory(cacheInventory(data.inventory));
       updateMyOrder(data.order, data.position);
     } catch {
@@ -2113,6 +2333,7 @@ function CustomerPage() {
       if (data.ok) {
         if (typeof data.isOpen === "boolean") setIsOpen(Boolean(data.isOpen));
         if (typeof data.message === "string") setMessage(data.message || "");
+        syncTheme(data.theme);
       }
     } catch {}
     await refreshInventoryOnly();
@@ -2135,7 +2356,10 @@ function CustomerPage() {
     menuLoadingRef.current = true;
     try {
       const data = await apiGet("menu");
-      if (data.ok && Array.isArray(data.drinks)) setMenuDrinks(normalizeMenuDrinks(data.drinks));
+      if (data.ok && Array.isArray(data.drinks)) {
+        setMenuDrinks(normalizeMenuDrinks(data.drinks));
+        syncTheme(data.theme);
+      }
     } catch {
     } finally {
       menuLoadingRef.current = false;
@@ -2150,6 +2374,7 @@ function CustomerPage() {
       if (data.ok) {
         setIsOpen(Boolean(data.isOpen));
         setMessage(data.message || "");
+        syncTheme(data.theme);
         return Boolean(data.isOpen);
       }
     } catch {

@@ -1063,6 +1063,89 @@ input:focus,textarea:focus{
 .menuEditorList{
   gap:16px;
 }
+.themePanel{
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+.themePreview,.themeSection{
+  background:linear-gradient(180deg, rgba(74,36,21,.76), rgba(35,15,8,.72));
+  border:1px solid var(--line);
+  border-radius:14px;
+  box-shadow:0 18px 60px rgba(0,0,0,.14);
+  padding:18px;
+}
+.themePreview{
+  display:grid;
+  grid-template-columns:1fr minmax(180px,260px);
+  align-items:center;
+  gap:18px;
+}
+.themePreview p{
+  color:var(--muted);
+  margin-top:4px;
+}
+.themePresetGrid,.themeColorGrid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:10px;
+}
+.themePreset{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  min-height:64px;
+  padding:12px;
+  border-radius:12px;
+  border:1px solid var(--line);
+  background:rgba(240,213,168,.075);
+  color:var(--text);
+  font-weight:800;
+}
+.themePreset div{
+  display:flex;
+  gap:5px;
+}
+.themePreset i{
+  width:20px;
+  height:20px;
+  border-radius:50%;
+  border:1px solid rgba(255,247,234,.34);
+  display:block;
+}
+.themeColorField{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  padding:12px;
+  border-radius:12px;
+  border:1px solid var(--line);
+  background:rgba(240,213,168,.065);
+}
+.themeColorField span{
+  color:var(--gold);
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:1px;
+  text-transform:uppercase;
+}
+.themeColorField div{
+  display:grid;
+  grid-template-columns:48px 1fr;
+  gap:8px;
+  align-items:center;
+}
+.themeColorField input[type="color"]{
+  width:48px;
+  height:44px;
+  padding:4px;
+}
+.themeActions{
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+}
 .menuEditorItem,.ingredientEditorItem{
   padding:16px;
 }

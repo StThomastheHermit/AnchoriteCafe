@@ -280,6 +280,10 @@ insert into settings (key, value) values
 ('message','""')
 on conflict (key) do nothing;
 
+insert into settings (key, value) values
+('theme','{"bg":"#0B0604","surface":"#32180D","surface2":"#4A2415","text":"#FFF7EA","muted":"#E5C6A1","gold":"#E7A94C","red":"#D84A38","green":"#A9BC75","copper":"#B7642C"}')
+on conflict (key) do nothing;
+
 alter table orders enable row level security;
 alter table inventory enable row level security;
 alter table menu_drinks enable row level security;
@@ -312,6 +316,24 @@ as $$
   select coalesce(
     (
       select trim(both '"' from value::text)
+      from settings
+      where key = input_key
+      limit 1
+    ),
+    fallback
+  );
+$$;
+
+create or replace function arise_setting_json(input_key text, fallback jsonb default '{}'::jsonb)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(
+    (
+      select value::jsonb
       from settings
       where key = input_key
       limit 1
@@ -459,7 +481,8 @@ as $$
     'drinks', arise_menu_json(arise_pin_matches(input_pin) or arise_employee_pin_matches(input_pin)),
     'milks', arise_inventory_menu_json(arise_pin_matches(input_pin) or arise_employee_pin_matches(input_pin))->'milks',
     'syrups', arise_inventory_menu_json(arise_pin_matches(input_pin) or arise_employee_pin_matches(input_pin))->'syrups',
-    'toppings', arise_inventory_menu_json(arise_pin_matches(input_pin) or arise_employee_pin_matches(input_pin))->'toppings'
+    'toppings', arise_inventory_menu_json(arise_pin_matches(input_pin) or arise_employee_pin_matches(input_pin))->'toppings',
+    'theme', arise_setting_json('theme')
   );
 $$;
 
@@ -498,7 +521,8 @@ as $$
   select jsonb_build_object(
     'ok', true,
     'isOpen', arise_setting('isOpen', 'true') = 'true',
-    'message', arise_setting('message', '')
+    'message', arise_setting('message', ''),
+    'theme', arise_setting_json('theme')
   );
 $$;
 
@@ -572,7 +596,8 @@ as $$
     'isOpen', arise_setting('isOpen', 'true') = 'true',
     'message', arise_setting('message', ''),
     'orders', coalesce(jsonb_agg(arise_order_json(active.order_row, active.position::integer) order by active.created_at), '[]'::jsonb),
-    'inventory', arise_inventory_json()
+    'inventory', arise_inventory_json(),
+    'theme', arise_setting_json('theme')
   )
   from active;
 $$;
@@ -699,7 +724,8 @@ begin
     'message', arise_setting('message', ''),
     'order', arise_order_json(found_order, found_position),
     'position', found_position,
-    'ordersAhead', case when found_position is null then null else greatest(0, found_position - 1) end
+    'ordersAhead', case when found_position is null then null else greatest(0, found_position - 1) end,
+    'theme', arise_setting_json('theme')
   );
 end;
 $$;
@@ -1391,6 +1417,44 @@ begin
 end;
 $$;
 
+drop function if exists arise_save_theme(text, jsonb);
+create or replace function arise_save_theme(input_pin text, input_theme jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  cleaned jsonb;
+begin
+  if not arise_pin_matches(input_pin) then
+    return jsonb_build_object('ok', false, 'error', 'Wrong PIN');
+  end if;
+
+  if jsonb_typeof(coalesce(input_theme, '{}'::jsonb)) <> 'object' then
+    return jsonb_build_object('ok', false, 'error', 'Invalid theme');
+  end if;
+
+  cleaned := jsonb_build_object(
+    'bg', coalesce(nullif(input_theme->>'bg', ''), '#0B0604'),
+    'surface', coalesce(nullif(input_theme->>'surface', ''), '#32180D'),
+    'surface2', coalesce(nullif(input_theme->>'surface2', ''), '#4A2415'),
+    'text', coalesce(nullif(input_theme->>'text', ''), '#FFF7EA'),
+    'muted', coalesce(nullif(input_theme->>'muted', ''), '#E5C6A1'),
+    'gold', coalesce(nullif(input_theme->>'gold', ''), '#E7A94C'),
+    'red', coalesce(nullif(input_theme->>'red', ''), '#D84A38'),
+    'green', coalesce(nullif(input_theme->>'green', ''), '#A9BC75'),
+    'copper', coalesce(nullif(input_theme->>'copper', ''), '#B7642C')
+  );
+
+  insert into settings (key, value)
+  values ('theme', cleaned)
+  on conflict (key) do update set value = excluded.value;
+
+  return jsonb_build_object('ok', true, 'theme', cleaned);
+end;
+$$;
+
 grant execute on function arise_status() to anon;
 grant execute on function arise_inventory() to anon;
 grant execute on function arise_menu(text) to anon;
@@ -1410,6 +1474,7 @@ grant execute on function arise_clear_archive(text) to anon;
 grant execute on function arise_analytics(text, integer) to anon;
 grant execute on function arise_finance(text) to anon;
 grant execute on function arise_save_finance(text, jsonb) to anon;
+grant execute on function arise_save_theme(text, jsonb) to anon;
 
 create table if not exists push_subscriptions (
   id uuid primary key default gen_random_uuid(),
