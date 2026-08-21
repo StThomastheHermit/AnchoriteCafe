@@ -149,7 +149,10 @@ insert into menu_drinks (id, label, description, category, temps, has_milk, has_
 ('strawberry-refresher','Strawberry Refresher','Iced fruit refresher','refresher',array['Cold'],false,false,false,true,5),
 ('mango-refresher','Mango Refresher','Iced fruit refresher','refresher',array['Cold'],false,false,false,true,6),
 ('strawberry-banana-smoothie','Strawberry Banana Smoothie','Blended smoothie','smoothie',array['Cold'],false,false,false,true,7),
-('mango-smoothie','Mango Smoothie','Blended smoothie','smoothie',array['Cold'],false,false,false,true,8)
+('mango-smoothie','Mango Smoothie','Blended smoothie','smoothie',array['Cold'],false,false,false,true,8),
+('water','Water','Bottled water','drink',array['Cold'],false,false,false,true,9),
+('soda','Soda','Canned soda','drink',array['Cold'],false,false,false,true,10),
+('juice','Juice','Bottled juice','drink',array['Cold'],false,false,false,true,11)
 on conflict (id) do nothing;
 
 insert into settings (key, value) values
@@ -713,7 +716,7 @@ begin
       left(coalesce(nullif(trim(drink_item->>'label'), ''), 'Drink'), 80),
       left(coalesce(drink_item->>'desc', ''), 180),
       case
-        when lower(coalesce(drink_item->>'category', 'coffee')) in ('coffee', 'refresher', 'smoothie') then lower(coalesce(drink_item->>'category', 'coffee'))
+        when lower(coalesce(drink_item->>'category', 'coffee')) in ('coffee', 'refresher', 'smoothie', 'drink') then lower(coalesce(drink_item->>'category', 'coffee'))
         else 'coffee'
       end,
       cleaned_temps,

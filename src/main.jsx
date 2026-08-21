@@ -20,7 +20,15 @@ const MENU_CATEGORIES = [
   { id: "coffee", label: "Coffees" },
   { id: "refresher", label: "Refreshers" },
   { id: "smoothie", label: "Smoothies" },
+  { id: "drink", label: "Soda / Water / Juice" },
 ];
+
+const MENU_PRICES = {
+  coffee: 5,
+  refresher: 5,
+  smoothie: 5,
+  drink: 3,
+};
 
 const DRINKS = [
   { id: "americano", label: "Americano", desc: "No milk, water only", category: "coffee", temps: ["Hot", "Cold"], milk: false, syrups: true },
@@ -32,6 +40,9 @@ const DRINKS = [
   { id: "mango-refresher", label: "Mango Refresher", desc: "Iced fruit refresher", category: "refresher", temps: ["Cold"], milk: false, syrups: false, toppings: true, showTemp: false },
   { id: "strawberry-banana-smoothie", label: "Strawberry Banana Smoothie", desc: "Blended smoothie", category: "smoothie", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
   { id: "mango-smoothie", label: "Mango Smoothie", desc: "Blended smoothie", category: "smoothie", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
+  { id: "water", label: "Water", desc: "Bottled water", category: "drink", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
+  { id: "soda", label: "Soda", desc: "Canned soda", category: "drink", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
+  { id: "juice", label: "Juice", desc: "Bottled juice", category: "drink", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
 ];
 
 const MILKS = ["Whole milk", "Almond milk", "Oat milk", "Soy milk"];
@@ -75,7 +86,16 @@ function normalizeDrinkCategory(drink) {
   const text = `${drink?.id || ""} ${drink?.label || ""}`.toLowerCase();
   if (text.includes("refresh")) return "refresher";
   if (text.includes("smoothie")) return "smoothie";
+  if (text.includes("soda") || text.includes("water") || text.includes("juice")) return "drink";
   return "coffee";
+}
+
+function priceForCategory(category) {
+  return MENU_PRICES[category] || 5;
+}
+
+function formatPrice(amount) {
+  return `$${Number(amount || 0).toFixed(2).replace(/\.00$/, "")}`;
 }
 
 function normalizeMenuDrinks(drinks, includeInactive = false) {
@@ -1530,6 +1550,7 @@ function CustomerPage() {
   const inventoryLookup = useMemo(() => buildInventoryLookup(inventory), [inventory]);
   const customerMilks = useMemo(() => inventoryItemsByType(inventory, "milk", MILKS).filter(item => item.available !== false), [inventory]);
   const customerSyrups = useMemo(() => inventoryItemsByType(inventory, "syrup", SYRUPS).filter(item => item.available !== false), [inventory]);
+  const cartTotal = useMemo(() => cart.reduce((sum, item) => sum + Number(item.price || 0), 0), [cart]);
   const pushDeviceHint = useMemo(() => getPushDeviceHint(), []);
   const requiresIosInstall = useMemo(() => isAppleTouchDevice() && !isStandaloneApp(), []);
 
@@ -1705,6 +1726,7 @@ function CustomerPage() {
     if (item.milk) parts.push(item.milk);
     if (item.syrups.length) parts.push(item.syrups.join(", "));
     if (item.toppings.length) parts.push(item.toppings.join(", "));
+    parts.push(formatPrice(item.price));
     return parts.join(" · ");
   }
 
@@ -1720,6 +1742,7 @@ function CustomerPage() {
       milk: drink.milk ? form.milk : "",
       syrups: drink.syrups ? form.syrups : [],
       toppings,
+      price: priceForCategory(drink.category),
       notes: form.notes.trim(),
     };
   }
@@ -1816,6 +1839,8 @@ function CustomerPage() {
         const item = cart[index];
         const noteParts = [
           `Cart item ${index + 1} of ${cart.length}`,
+          `Item price: ${formatPrice(item.price)}`,
+          `Cart total: ${formatPrice(cartTotal)}`,
           `Payment: ${payment?.label || paymentMethod}`,
           item.toppings.length ? `Refresher toppings: ${item.toppings.join(", ")}` : "",
           item.notes,
@@ -1972,7 +1997,7 @@ function CustomerPage() {
                 <div className="drinkGroups">
                   {drinksByCategory.map(category => (
                     <div className="drinkGroup" key={category.id}>
-                      <h3>{category.label}</h3>
+                      <h3>{category.label} <span>{formatPrice(priceForCategory(category.id))}</span></h3>
                       <div className="drinkList">
                         {category.drinks.map(d => (
                           <button key={d.id} className={form.drinkId === d.id ? "drink active" : "drink"} onClick={() => setForm(f => ({...f, drinkId: d.id}))}>
@@ -2087,6 +2112,10 @@ function CustomerPage() {
                   </div>
                 )}
                 {errors.cart && <div className="errorText">{errors.cart}</div>}
+                <div className="cartTotal">
+                  <span>Total</span>
+                  <strong>{formatPrice(cartTotal)}</strong>
+                </div>
 
                 <div className="paymentBox">
                   {lbl("Payment", "(required before checkout)")}
