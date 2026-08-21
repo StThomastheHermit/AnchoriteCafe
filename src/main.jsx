@@ -2562,7 +2562,7 @@ function DisplayPage() {
     <main className="displayPage">
       <header className="displayHeader">
         <div>
-          <h1>ARISE! COFFEE</h1>
+          <h1>ANCHORITE CAFE</h1>
           <p>{new Date().toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })} • Live pickup board</p>
         </div>
         {!isFullscreen && <button className="displayFullscreenBtn" onClick={toggleFullscreen}>Fullscreen</button>}

@@ -64,7 +64,7 @@ Deno.serve(async req => {
       ].filter(Boolean).join(" ");
 
       const payload = JSON.stringify({
-        title: "Arise! Coffee",
+        title: "Anchorite Cafe",
         body,
         orderId: row.order_id,
         url: `/?order=${encodeURIComponent(row.order_id)}`,
