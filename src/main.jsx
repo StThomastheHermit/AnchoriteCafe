@@ -6,6 +6,8 @@ import { getPushDeviceHint, getPushSupportStatus, isAppleTouchDevice, isStandalo
 
 const DONATION_ZELLE = "Donate@stthomascoc.org";
 const ZELLE_PAYMENT_URL = "";
+const CLOCK_PATH = "/clock";
+const STAFF_PATH = "/staff";
 const INVENTORY_CACHE_KEY = "arise-inventory-cache";
 const INVENTORY_CACHE_MS = 5 * 60 * 1000;
 const TEXT_SIZE_KEY = "arise-text-size";
@@ -333,13 +335,14 @@ function ringReadyAlert() {
 function Header({ isOpen, statusText }) {
   const path = window.location.pathname.toLowerCase();
   const isAdminPage = path.startsWith("/admin");
+  const isClockPage = path.startsWith(CLOCK_PATH) || path.startsWith("/timeclock") || path.startsWith(STAFF_PATH);
   return (
     <header>
       <a className="brand" href="/">
         <span><img src="/icons/anchorite-icon-192.png" alt="" /></span>
         <div><h1>Anchorite Cafe</h1><p>Faith fueled soul rooted</p></div>
       </a>
-      {!isAdminPage && <a className="adminLink" href="/admin">Admin Access</a>}
+      {!isAdminPage && !isClockPage && <a className="adminLink" href="/admin">Admin Access</a>}
       <div className={isOpen ? "pill open" : "pill closed"}>{statusText || (isOpen ? "● Open" : "● Closed")}</div>
     </header>
   );
@@ -758,6 +761,10 @@ function AdminPage() {
     if (!isOwner) return;
     setAdminView("timeclock");
     if (!timeClockLoaded) await loadTimeClock();
+  }
+
+  function openStaffClock() {
+    window.location.assign(STAFF_PATH);
   }
 
   async function saveEmployee() {
@@ -1276,6 +1283,10 @@ function AdminPage() {
           <button className="toolTile" onClick={openMenuScreen}>
             <strong>Menu</strong>
             <span>{isOwner ? "Drinks, milks, syrups" : "Availability and sold out"}</span>
+          </button>
+          <button className="toolTile" onClick={openStaffClock}>
+            <strong>Staff Clock</strong>
+            <span>QR and phone link</span>
           </button>
           {isOwner && <button className={archiveOpen ? "toolTile active" : "toolTile"} onClick={toggleArchive}>
             <strong>Archive</strong>
@@ -2659,8 +2670,42 @@ function EmployeeClockPage() {
   );
 }
 
+function StaffClockAccessPage() {
+  const clockUrl = `${window.location.origin}${CLOCK_PATH}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=12&data=${encodeURIComponent(clockUrl)}`;
+
+  async function copyClockLink() {
+    try {
+      await navigator.clipboard.writeText(clockUrl);
+      alert("Clock link copied");
+    } catch {
+      alert(clockUrl);
+    }
+  }
+
+  return (
+    <>
+      <Header isOpen={true} statusText="Staff Clock" />
+      <main className="pinPage clockPage">
+        <section className="modal pinModal static clockCard staffClockCard">
+          <h2>Staff Clock</h2>
+          <p>Scan this code on your phone, then enter your personal PIN.</p>
+          <div className="clockQrWrap">
+            <img src={qrUrl} alt="QR code for employee clock-in" />
+          </div>
+          <a className="joinBtn clockLargeLink" href={CLOCK_PATH}>Clock In / Out</a>
+          <button className="ghostBtn" onClick={copyClockLink}>Copy clock link</button>
+          <div className="clockLinkText">{clockUrl}</div>
+          <a className="adminMetaLink clockAdminLink" href="/admin">Back to Admin</a>
+        </section>
+      </main>
+    </>
+  );
+}
+
 function App() {
   const path = window.location.pathname.toLowerCase();
+  if (path.startsWith(STAFF_PATH)) return <StaffClockAccessPage />;
   if (path.startsWith("/clock") || path.startsWith("/timeclock")) return <EmployeeClockPage />;
   if (path.startsWith("/display") || path.startsWith("/tv")) return <DisplayPage />;
   return path.startsWith("/admin") ? <AdminPage /> : <CustomerPage />;
