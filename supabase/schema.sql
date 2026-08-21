@@ -351,9 +351,9 @@ set search_path = public
 as $$
   select jsonb_build_object(
     'ok', true,
-    'drinks', arise_menu_json(arise_pin_matches(input_pin)),
-    'milks', arise_inventory_menu_json(arise_pin_matches(input_pin))->'milks',
-    'syrups', arise_inventory_menu_json(arise_pin_matches(input_pin))->'syrups'
+    'drinks', arise_menu_json(arise_pin_matches(input_pin) or arise_employee_pin_matches(input_pin)),
+    'milks', arise_inventory_menu_json(arise_pin_matches(input_pin) or arise_employee_pin_matches(input_pin))->'milks',
+    'syrups', arise_inventory_menu_json(arise_pin_matches(input_pin) or arise_employee_pin_matches(input_pin))->'syrups'
   );
 $$;
 
@@ -705,7 +705,7 @@ as $$
 declare
   changed integer;
 begin
-  if not arise_pin_matches(input_pin) then
+  if not (arise_pin_matches(input_pin) or arise_employee_pin_matches(input_pin)) then
     return jsonb_build_object('ok', false, 'error', 'Wrong PIN');
   end if;
 
@@ -739,7 +739,7 @@ declare
   drink_index integer := 0;
   ingredient_index integer := 0;
 begin
-  if not arise_pin_matches(input_pin) then
+  if not (arise_pin_matches(input_pin) or arise_employee_pin_matches(input_pin)) then
     return jsonb_build_object('ok', false, 'error', 'Wrong PIN');
   end if;
 

@@ -473,6 +473,7 @@ function AdminPage() {
   const adminMilks = useMemo(() => inventoryItemsByType(inventory, "milk", MILKS), [inventory]);
   const isOwner = auth?.role === "owner";
   const isEmployee = auth?.role === "employee";
+  const canWorkQueue = isOwner || isEmployee;
   const clockedInEmployees = useMemo(() => (timeClock.totals || []).filter(total => total.clockedIn), [timeClock]);
   const openShiftEntries = useMemo(() => (timeClock.entries || []).filter(entry => !entry.clockOut), [timeClock]);
 
@@ -539,7 +540,7 @@ function AdminPage() {
     await Promise.all([
       refreshOrders(),
       refreshStatus(),
-      isOwner ? refreshInventory() : Promise.resolve(),
+      canWorkQueue ? refreshInventory() : Promise.resolve(),
       isOwner ? loadTimeClock() : Promise.resolve(),
     ]);
   }
@@ -571,11 +572,11 @@ function AdminPage() {
   }, [pin]);
 
   async function saveAdmin(payload) {
-    if (!isOwner) {
-      alert("Owner PIN required.");
+    if (!canWorkQueue) {
+      alert("PIN required.");
       return;
     }
-    if (payload.isOpen === false && isOpen && clockedInEmployees.length > 0) {
+    if (isOwner && payload.isOpen === false && isOpen && clockedInEmployees.length > 0) {
       const names = clockedInEmployees.map(employee => employee.name).join(", ");
       const ok = confirm(`Employees still clocked in: ${names}. Close the queue anyway?`);
       if (!ok) {
@@ -842,7 +843,7 @@ function AdminPage() {
   }
 
   async function openMenuScreen() {
-    if (!isOwner) return;
+    if (!canWorkQueue) return;
     setMenuOpen(true);
     setAdminView("menu");
     if (!menuLoaded) await loadMenu();
@@ -1000,14 +1001,14 @@ function AdminPage() {
           <section className="adminTop">
             <div>
               <h2>Menu</h2>
-              <p className="sub">Add drinks and control what customers can order.</p>
+              <p className="sub">{isOwner ? "Add drinks and control what customers can order." : "Hide sold-out drinks and update availability."}</p>
             </div>
             <div className="adminTopActions menuPageActions">
               <div className="menuSaveBar">
                 <button className="primaryBtn compactPrimary" disabled={menuBusy} onClick={saveMenuDrinks}>{menuBusy ? "Saving..." : "Save menu"}</button>
               </div>
               <button className="ghostBtn" disabled={menuBusy} onClick={loadMenu}>Refresh</button>
-              <button className="ghostBtn" disabled={menuBusy} onClick={addMenuDrink}>Add drink</button>
+              {isOwner && <button className="ghostBtn" disabled={menuBusy} onClick={addMenuDrink}>Add drink</button>}
               <button className="ghostBtn" onClick={() => { setMenuOpen(false); setAdminView("dashboard"); }}>Back to dashboard</button>
             </div>
           </section>
@@ -1017,6 +1018,7 @@ function AdminPage() {
             milks={menuMilks}
             syrups={menuSyrups}
             busy={menuBusy}
+            staffMode={!isOwner}
             onAddIngredient={addMenuIngredient}
             onRemove={removeMenuDrink}
             onRemoveIngredient={removeMenuIngredient}
@@ -1253,7 +1255,7 @@ function AdminPage() {
           </section>
         )}
 
-        {isOwner && <section className="adminCommandCenter">
+        {canWorkQueue && <section className="adminCommandCenter">
           <div className="queueCommand">
             <div>
               <div className="label">Queue Status</div>
@@ -1266,27 +1268,27 @@ function AdminPage() {
 
           <div className="adminQuickActions">
             <button className="ghostBtn" onClick={clearCompleted}>Archive ready ({readyArchiveCount})</button>
-            <button className="dangerOutlineBtn" onClick={clearAll}>Clear all after close</button>
+            {isOwner && <button className="dangerOutlineBtn" onClick={clearAll}>Clear all after close</button>}
           </div>
         </section>}
 
-        {isOwner && <section className="adminTools">
+        {canWorkQueue && <section className="adminTools">
           <button className="toolTile" onClick={openMenuScreen}>
             <strong>Menu</strong>
-            <span>Drinks, milks, syrups</span>
+            <span>{isOwner ? "Drinks, milks, syrups" : "Availability and sold out"}</span>
           </button>
-          <button className={archiveOpen ? "toolTile active" : "toolTile"} onClick={toggleArchive}>
+          {isOwner && <button className={archiveOpen ? "toolTile active" : "toolTile"} onClick={toggleArchive}>
             <strong>Archive</strong>
             <span>View past orders</span>
-          </button>
-          <button className={analyticsOpen ? "toolTile active" : "toolTile"} onClick={toggleAnalytics}>
+          </button>}
+          {isOwner && <button className={analyticsOpen ? "toolTile active" : "toolTile"} onClick={toggleAnalytics}>
             <strong>Analytics</strong>
             <span>Popular items</span>
-          </button>
-          <button className={adminView === "timeclock" ? "toolTile active" : "toolTile"} onClick={openTimeClockScreen}>
+          </button>}
+          {isOwner && <button className={adminView === "timeclock" ? "toolTile active" : "toolTile"} onClick={openTimeClockScreen}>
             <strong>Time Clock</strong>
             <span>Employee hours</span>
-          </button>
+          </button>}
         </section>}
 
         {isOwner && <section className="panel closedMessagePanel">
@@ -1305,7 +1307,7 @@ function AdminPage() {
           {notice && <div className="notice">{notice}</div>}
         </section>}
 
-        {isOwner && <section className="inventoryPanel">
+        {canWorkQueue && <section className="inventoryPanel">
           <div className="sectionHeader">
             <div>
               <h2>Syrup & Milk Inventory</h2>
@@ -1391,6 +1393,7 @@ function MenuEditor({
   milks,
   syrups,
   busy,
+  staffMode = false,
   onAddIngredient,
   onRemove,
   onRemoveIngredient,
@@ -1402,6 +1405,7 @@ function MenuEditor({
   onUpdateIngredient,
 }) {
   function toggleTemp(drink, temp) {
+    if (staffMode) return;
     const hasTemp = drink.temps.includes(temp);
     const nextTemps = hasTemp ? drink.temps.filter(t => t !== temp) : [...drink.temps, temp];
     onUpdate(drink.id, {
@@ -1411,6 +1415,7 @@ function MenuEditor({
   }
 
   function updateCategory(drink, category) {
+    if (staffMode) return;
     const isRefresher = category === "refresher";
     const isCoffee = category === "coffee";
     onUpdate(drink.id, {
@@ -1429,7 +1434,7 @@ function MenuEditor({
         <div className="menuSubhead">
           <div>
             <h3>Drinks</h3>
-            <p>Control the order form drink choices.</p>
+            <p>{staffMode ? "Mark drinks visible or sold out for customers." : "Control the order form drink choices."}</p>
           </div>
           <span>{drinks.filter(drink => drink.active).length} visible</span>
         </div>
@@ -1439,7 +1444,7 @@ function MenuEditor({
             <div
               className={drink.active ? "menuEditorItem" : "menuEditorItem inactive"}
               key={drink.id}
-              draggable={!busy}
+              draggable={!busy && !staffMode}
               onDragStart={event => {
                 event.dataTransfer.effectAllowed = "move";
                 event.dataTransfer.setData("text/plain", drink.id);
@@ -1464,15 +1469,15 @@ function MenuEditor({
               <div className="menuCardBody">
                 <label>
                   <span className="label">Name</span>
-                  <input value={drink.label} onChange={e => onUpdate(drink.id, { label: e.target.value })} placeholder="Drink name" />
+                  <input value={drink.label} disabled={staffMode} onChange={e => onUpdate(drink.id, { label: e.target.value })} placeholder="Drink name" />
                 </label>
                 <label>
                   <span className="label">Description</span>
-                  <input value={drink.desc} onChange={e => onUpdate(drink.id, { desc: e.target.value })} placeholder="Short description" />
+                  <input value={drink.desc} disabled={staffMode} onChange={e => onUpdate(drink.id, { desc: e.target.value })} placeholder="Short description" />
                 </label>
               </div>
 
-              <div className="menuCardControls">
+              {!staffMode && <div className="menuCardControls">
                 <div>
                   <div className="label">Category</div>
                   <div className="menuTempRow">
@@ -1517,13 +1522,13 @@ function MenuEditor({
                     </label>
                   </div>
                 </div>
-              </div>
+              </div>}
 
               <div className="menuItemActions">
                 <button className="ghostBtn" disabled={busy} onClick={() => onUpdate(drink.id, { active: !drink.active })}>{drink.active ? "Hide" : "Show"}</button>
-                <button className="ghostBtn" disabled={busy || index === 0} onClick={() => onMove(drink.id, -1)}>Move up</button>
-                <button className="ghostBtn" disabled={busy || index === drinks.length - 1} onClick={() => onMove(drink.id, 1)}>Move down</button>
-                <button className="dangerOutlineBtn" disabled={busy || drinks.length <= 1} onClick={() => onRemove(drink.id)}>Delete</button>
+                {!staffMode && <button className="ghostBtn" disabled={busy || index === 0} onClick={() => onMove(drink.id, -1)}>Move up</button>}
+                {!staffMode && <button className="ghostBtn" disabled={busy || index === drinks.length - 1} onClick={() => onMove(drink.id, 1)}>Move down</button>}
+                {!staffMode && <button className="dangerOutlineBtn" disabled={busy || drinks.length <= 1} onClick={() => onRemove(drink.id)}>Delete</button>}
               </div>
             </div>
           ))}
@@ -1535,6 +1540,7 @@ function MenuEditor({
         type="milk"
         items={milks}
         busy={busy}
+        staffMode={staffMode}
         onAdd={onAddIngredient}
         onUpdate={onUpdateIngredient}
         onMove={onMoveIngredient}
@@ -1547,6 +1553,7 @@ function MenuEditor({
         type="syrup"
         items={syrups}
         busy={busy}
+        staffMode={staffMode}
         onAdd={onAddIngredient}
         onUpdate={onUpdateIngredient}
         onMove={onMoveIngredient}
@@ -1557,17 +1564,17 @@ function MenuEditor({
   );
 }
 
-function IngredientMenuSection({ title, type, items, busy, onAdd, onUpdate, onMove, onReorder, onRemove }) {
+function IngredientMenuSection({ title, type, items, busy, staffMode = false, onAdd, onUpdate, onMove, onReorder, onRemove }) {
   return (
     <div className="menuSectionCard ingredientMenuSection">
       <div className="menuSubhead">
         <div>
           <h3>{title}</h3>
-          <p>{type === "milk" ? "Milk choices for drinks that need milk." : "Syrup choices shown to customers."}</p>
+          <p>{staffMode ? "Mark items available or out of stock." : type === "milk" ? "Milk choices for drinks that need milk." : "Syrup choices shown to customers."}</p>
         </div>
         <div className="menuSubActions">
           <span>{items.filter(item => item.active).length} visible</span>
-          <button className="ghostBtn" disabled={busy} onClick={() => onAdd(type)}>Add {type === "milk" ? "milk" : "syrup"}</button>
+          {!staffMode && <button className="ghostBtn" disabled={busy} onClick={() => onAdd(type)}>Add {type === "milk" ? "milk" : "syrup"}</button>}
         </div>
       </div>
 
@@ -1576,7 +1583,7 @@ function IngredientMenuSection({ title, type, items, busy, onAdd, onUpdate, onMo
           <div
             className={item.active ? "ingredientEditorItem" : "ingredientEditorItem inactive"}
             key={item.id}
-            draggable={!busy}
+            draggable={!busy && !staffMode}
             onDragStart={event => {
               event.dataTransfer.effectAllowed = "move";
               event.dataTransfer.setData("text/plain", item.id);
@@ -1600,15 +1607,15 @@ function IngredientMenuSection({ title, type, items, busy, onAdd, onUpdate, onMo
 
             <label className="menuNameField">
               <span>Name</span>
-              <input value={item.item} onChange={e => onUpdate(type, item.id, { item: e.target.value })} />
+              <input value={item.item} disabled={staffMode} onChange={e => onUpdate(type, item.id, { item: e.target.value })} />
             </label>
 
             <div className="menuItemActions">
-              <button className="ghostBtn" disabled={busy} onClick={() => onUpdate(type, item.id, { active: !item.active })}>{item.active ? "Hide" : "Show"}</button>
               <button className="ghostBtn" disabled={busy} onClick={() => onUpdate(type, item.id, { available: !item.available })}>{item.available ? "Mark out" : "Mark available"}</button>
-              <button className="ghostBtn" disabled={busy || index === 0} onClick={() => onMove(type, item.id, -1)}>Up</button>
-              <button className="ghostBtn" disabled={busy || index === items.length - 1} onClick={() => onMove(type, item.id, 1)}>Down</button>
-              <button className="dangerOutlineBtn" disabled={busy || items.length <= 1} onClick={() => onRemove(type, item.id)}>Delete</button>
+              {!staffMode && <button className="ghostBtn" disabled={busy} onClick={() => onUpdate(type, item.id, { active: !item.active })}>{item.active ? "Hide" : "Show"}</button>}
+              {!staffMode && <button className="ghostBtn" disabled={busy || index === 0} onClick={() => onMove(type, item.id, -1)}>Up</button>}
+              {!staffMode && <button className="ghostBtn" disabled={busy || index === items.length - 1} onClick={() => onMove(type, item.id, 1)}>Down</button>}
+              {!staffMode && <button className="dangerOutlineBtn" disabled={busy || items.length <= 1} onClick={() => onRemove(type, item.id)}>Delete</button>}
             </div>
           </div>
         ))}
