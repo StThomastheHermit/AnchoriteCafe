@@ -469,6 +469,8 @@ function AdminPage() {
   const messageEditingRef = useRef(false);
   const adminSyrups = useMemo(() => inventoryItemsByType(inventory, "syrup", SYRUPS), [inventory]);
   const adminMilks = useMemo(() => inventoryItemsByType(inventory, "milk", MILKS), [inventory]);
+  const clockedInEmployees = useMemo(() => (timeClock.totals || []).filter(total => total.clockedIn), [timeClock]);
+  const openShiftEntries = useMemo(() => (timeClock.entries || []).filter(entry => !entry.clockOut), [timeClock]);
 
   function syncAdminMessage(nextMessage) {
     if (!messageEditingRef.current && typeof nextMessage === "string") {
@@ -530,7 +532,7 @@ function AdminPage() {
   }
 
   async function refreshAdminData() {
-    await Promise.all([refreshOrders(), refreshStatus(), refreshInventory()]);
+    await Promise.all([refreshOrders(), refreshStatus(), refreshInventory(), loadTimeClock()]);
   }
 
   useEffect(() => {
@@ -560,6 +562,15 @@ function AdminPage() {
   }, [pin]);
 
   async function saveAdmin(payload) {
+    if (payload.isOpen === false && isOpen && clockedInEmployees.length > 0) {
+      const names = clockedInEmployees.map(employee => employee.name).join(", ");
+      const ok = confirm(`Employees still clocked in: ${names}. Close the queue anyway?`);
+      if (!ok) {
+        setAdminView("timeclock");
+        if (!timeClockLoaded) await loadTimeClock();
+        return;
+      }
+    }
     setBusy(true);
     setNotice("");
     try {
@@ -761,6 +772,21 @@ function AdminPage() {
       const data = await apiPost({ action: "toggleEmployee", pin, employeeId: employee.id, active: employee.active === false });
       if (data.ok) await loadTimeClock();
       else alert(data.error || "Could not update employee");
+    } catch {
+      alert("Connection error");
+    } finally {
+      setTimeClockBusy(false);
+    }
+  }
+
+  async function closeShift(entry) {
+    const ok = confirm(`Clock out ${entry.employeeName || "this employee"} now?`);
+    if (!ok) return;
+    setTimeClockBusy(true);
+    try {
+      const data = await apiPost({ action: "closeShift", pin, entryId: entry.id });
+      if (data.ok) await loadTimeClock();
+      else alert(data.error || "Could not close shift");
     } catch {
       alert("Connection error");
     } finally {
@@ -1162,6 +1188,7 @@ function AdminPage() {
                   <span>{formatShiftTime(entry.clockIn)}</span>
                   <span>{formatShiftTime(entry.clockOut)}</span>
                   <em>{entry.clockOut ? formatHours(entry.hours) : "Open shift"}</em>
+                  {!entry.clockOut && <button className="ghostBtn" disabled={timeClockBusy} onClick={() => closeShift(entry)}>Clock out now</button>}
                 </div>
               ))}
             </div>
@@ -1191,6 +1218,16 @@ function AdminPage() {
             <button className="ghostBtn" onClick={() => { setPin(""); }}>Log out</button>
           </div>
         </section>
+
+        {clockedInEmployees.length > 0 && (
+          <section className="clockBanner">
+            <div>
+              <strong>{clockedInEmployees.length} clocked in</strong>
+              <span>{clockedInEmployees.map(employee => employee.name).join(", ")}</span>
+            </div>
+            <button className="ghostBtn" onClick={openTimeClockScreen}>Review time clock</button>
+          </section>
+        )}
 
         <section className="adminCommandCenter">
           <div className="queueCommand">

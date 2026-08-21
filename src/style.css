@@ -85,9 +85,12 @@ input:focus,textarea:focus{outline:2px solid #C8823A}
 .employeeCard p{color:var(--muted);font-size:12px;margin-top:3px}
 .employeeCard button{grid-column:1 / -1}
 .timeEntryList{display:flex;flex-direction:column;gap:8px}
-.timeEntry{display:grid;grid-template-columns:1.1fr 1.4fr 1.4fr auto;gap:10px;align-items:center;background:rgba(255,246,232,.07);border:1px solid var(--line);border-radius:10px;padding:12px;color:var(--muted);font-size:12px}
+.timeEntry{display:grid;grid-template-columns:1.1fr 1.4fr 1.4fr auto auto;gap:10px;align-items:center;background:rgba(255,246,232,.07);border:1px solid var(--line);border-radius:10px;padding:12px;color:var(--muted);font-size:12px}
 .timeEntry strong{color:var(--text);font-size:13px}
 .timeEntry em{color:var(--gold);font-style:normal;font-weight:800;text-align:right}
+.clockBanner{display:flex;justify-content:space-between;align-items:center;gap:14px;background:rgba(155,170,120,.14);border:1px solid rgba(155,170,120,.42);border-radius:14px;padding:14px 16px;margin-bottom:16px}
+.clockBanner strong,.clockBanner span{display:block}
+.clockBanner span{color:var(--muted);font-size:12px;margin-top:3px}
 .clockCard{display:flex;flex-direction:column;gap:12px}
 .clockCard p{margin-bottom:0}
 .clockResult{border-radius:12px;border:1px solid var(--line);background:rgba(255,246,232,.08);padding:14px;text-align:left}

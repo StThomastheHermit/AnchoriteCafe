@@ -1416,3 +1416,31 @@ begin
   return jsonb_build_object('ok', true, 'employee', arise_employee_json(saved_employee));
 end;
 $$;
+
+drop function if exists arise_close_shift(text, text);
+create or replace function arise_close_shift(input_pin text, input_entry_id text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  saved_entry time_entries;
+begin
+  if not arise_pin_matches(input_pin) then
+    return jsonb_build_object('ok', false, 'error', 'Wrong PIN');
+  end if;
+
+  update time_entries
+  set clock_out = now()
+  where id::text = input_entry_id
+    and clock_out is null
+  returning * into saved_entry;
+
+  if saved_entry is null then
+    return jsonb_build_object('ok', false, 'error', 'Open shift not found');
+  end if;
+
+  return jsonb_build_object('ok', true, 'entry', arise_time_entry_json(saved_entry));
+end;
+$$;
