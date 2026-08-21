@@ -830,8 +830,9 @@ $$;
 
 drop function if exists arise_save_menu(text, jsonb);
 drop function if exists arise_save_menu(text, jsonb, jsonb, jsonb);
+drop function if exists arise_save_menu(text, jsonb, jsonb, jsonb, jsonb);
 
-create or replace function arise_save_menu(input_pin text, input_drinks jsonb, input_milks jsonb default '[]'::jsonb, input_syrups jsonb default '[]'::jsonb)
+create or replace function arise_save_menu(input_pin text, input_drinks jsonb, input_milks jsonb default '[]'::jsonb, input_syrups jsonb default '[]'::jsonb, input_toppings jsonb default '[]'::jsonb)
 returns jsonb
 language plpgsql
 security definer
@@ -850,7 +851,8 @@ begin
 
   if jsonb_typeof(coalesce(input_drinks, '[]'::jsonb)) <> 'array'
     or jsonb_typeof(coalesce(input_milks, '[]'::jsonb)) <> 'array'
-    or jsonb_typeof(coalesce(input_syrups, '[]'::jsonb)) <> 'array' then
+    or jsonb_typeof(coalesce(input_syrups, '[]'::jsonb)) <> 'array'
+    or jsonb_typeof(coalesce(input_toppings, '[]'::jsonb)) <> 'array' then
     return jsonb_build_object('ok', false, 'error', 'Invalid menu');
   end if;
 
@@ -920,7 +922,7 @@ begin
     drink_index := drink_index + 1;
   end loop;
 
-  delete from inventory where type in ('milk', 'syrup');
+  delete from inventory where type in ('milk', 'syrup', 'topping');
 
   ingredient_index := 0;
   for ingredient_item in
@@ -948,6 +950,23 @@ begin
     values (
       left(coalesce(nullif(trim(ingredient_item->>'item'), ''), 'Syrup'), 80),
       'syrup',
+      coalesce((ingredient_item->>'available')::boolean, true),
+      coalesce((ingredient_item->>'active')::boolean, true),
+      ingredient_index
+    );
+
+    ingredient_index := ingredient_index + 1;
+  end loop;
+
+  ingredient_index := 0;
+  for ingredient_item in
+    select value
+    from jsonb_array_elements(input_toppings)
+  loop
+    insert into inventory (item, type, available, active, sort_order)
+    values (
+      left(coalesce(nullif(trim(ingredient_item->>'item'), ''), 'Topping'), 80),
+      'topping',
       coalesce((ingredient_item->>'available')::boolean, true),
       coalesce((ingredient_item->>'active')::boolean, true),
       ingredient_index
