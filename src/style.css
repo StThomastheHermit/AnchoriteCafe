@@ -70,6 +70,7 @@ input:focus,textarea:focus{outline:2px solid #C8823A}
 .paymentBox{margin:14px 0}
 .paymentNote{color:var(--muted);font-size:12px;line-height:1.45;margin:-2px 0 10px}
 .paymentChoices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.paymentChoices.single{grid-template-columns:1fr}
 .paymentChoice{min-width:0;padding:11px;border-radius:6px;background:#2C1400;color:#8A9B8E;border:1px solid rgba(200,130,58,.18);text-align:left}
 .paymentChoice strong,.paymentChoice span{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .paymentChoice strong{color:#FFF8F0;font-size:13px}
@@ -446,15 +447,15 @@ input:focus,textarea:focus{outline:2px solid #C8823A}
   flex-direction:column;
   gap:10px;
 }
-.venmoBtn,.zelleBtn{
+.modalPrimaryBtn,.zelleBtn{
   width:100%;
   padding:12px 14px;
   border-radius:8px;
   font-weight:700;
   text-align:center;
 }
-.venmoBtn{
-  background:#3D95CE;
+.modalPrimaryBtn{
+  background:#A63D32;
   color:white;
   border:none;
 }

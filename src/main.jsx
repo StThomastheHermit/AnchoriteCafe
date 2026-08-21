@@ -4,12 +4,8 @@ import "./style.css";
 import { apiGet, apiPost } from "./api/backend";
 import { getPushDeviceHint, getPushSupportStatus, isAppleTouchDevice, isStandaloneApp, sendReadyNotification, subscribeToReadyNotification } from "./api/pushNotifications";
 
-const DONATION_VENMO_URL = "https://account.venmo.com/u/HolyTransfiguration-OrthodoxCh";
 const DONATION_ZELLE = "htacoc@gmail.com";
-const PAYMENT_OPTIONS = [
-  { id: "venmo", label: "Venmo", detail: "@HolyTransfiguration-OrthodoxCh", url: DONATION_VENMO_URL },
-  { id: "zelle", label: "Zelle", detail: DONATION_ZELLE },
-];
+const ZELLE_PAYMENT_URL = "";
 const INVENTORY_CACHE_KEY = "arise-inventory-cache";
 const INVENTORY_CACHE_MS = 5 * 60 * 1000;
 const TEXT_SIZE_KEY = "arise-text-size";
@@ -1446,13 +1442,10 @@ function DonationModal({ onClose }) {
         <div className="donationIcon">☕</div>
         <h2>Payment</h2>
         <p>
-          Payment is not verified automatically. Please send Venmo or Zelle, then show staff your confirmation if asked.
+          Payment is not verified automatically. Please send Zelle, then show staff your confirmation if asked.
         </p>
 
         <div className="donationActions">
-          <a className="venmoBtn" href={DONATION_VENMO_URL} target="_blank" rel="noreferrer">
-            Pay with Venmo
-          </a>
           <button className="zelleBtn" onClick={copyZelle}>
             Zelle: {DONATION_ZELLE}
           </button>
@@ -1479,7 +1472,7 @@ function ReadyAlertModal({ busy, message, deviceHint, onEnable, onClose }) {
         {message && <p className="readyAlertMessage">{message}</p>}
 
         <div className="donationActions">
-          <button className="venmoBtn readyAlertBtn" disabled={busy} onClick={onEnable}>
+          <button className="modalPrimaryBtn readyAlertBtn" disabled={busy} onClick={onEnable}>
             {busy ? "Enabling..." : "Notify me"}
           </button>
           <button className="plainBtn donationSkip" onClick={onClose}>
@@ -1524,7 +1517,7 @@ function CustomerPage() {
   const [myOrderPosition, setMyOrderPosition] = useState(1);
   const [busy, setBusy] = useState(false);
   const [cart, setCart] = useState([]);
-  const [paymentMethod, setPaymentMethod] = useState("");
+  const [paymentStarted, setPaymentStarted] = useState(false);
   const [showDonation, setShowDonation] = useState(false);
   const [showReadyAlertPrompt, setShowReadyAlertPrompt] = useState(false);
   const [readyAlertShown, setReadyAlertShown] = useState(false);
@@ -1761,7 +1754,7 @@ function CustomerPage() {
   function validateCheckout() {
     const e = {};
     if (!cart.length) e.cart = "Add at least one item to your cart";
-    if (!paymentMethod) e.payment = "Choose Venmo or Zelle before checkout";
+    if (!paymentStarted) e.payment = "Go to Zelle first, then return and confirm payment";
     return e;
   }
 
@@ -1787,6 +1780,26 @@ function CustomerPage() {
 
   function removeCartItem(id) {
     setCart(current => current.filter(item => item.id !== id));
+    setPaymentStarted(false);
+  }
+
+  async function startZellePayment() {
+    if (!cart.length) {
+      setErrors({ cart: "Add at least one item to your cart" });
+      return;
+    }
+    setErrors(er => ({ ...er, payment: "" }));
+    setPaymentStarted(true);
+    if (ZELLE_PAYMENT_URL) {
+      window.location.href = ZELLE_PAYMENT_URL;
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(DONATION_ZELLE);
+      alert("Zelle email copied. Send payment, then return here and tap I paid, place order.");
+    } catch {
+      alert("Send Zelle to " + DONATION_ZELLE + ", then return here and tap I paid, place order.");
+    }
   }
 
   function useLastOrder() {
@@ -1832,7 +1845,6 @@ function CustomerPage() {
     }
 
     try {
-      const payment = PAYMENT_OPTIONS.find(option => option.id === paymentMethod);
       const placed = [];
       for (let index = 0; index < cart.length; index += 1) {
         const item = cart[index];
@@ -1840,7 +1852,8 @@ function CustomerPage() {
           `Cart item ${index + 1} of ${cart.length}`,
           `Item price: ${formatPrice(item.price)}`,
           `Cart total: ${formatPrice(cartTotal)}`,
-          `Payment: ${payment?.label || paymentMethod}`,
+          "Payment: Zelle",
+          "Payment verification: staff must confirm manually",
           item.toppings.length ? `Refresher toppings: ${item.toppings.join(", ")}` : "",
           item.notes,
         ].filter(Boolean);
@@ -1891,13 +1904,13 @@ function CustomerPage() {
         temp: first.temp,
         milk: first.milk,
         syrups: [...first.syrups, ...first.toppings].join(", "),
-        notes: `Paid with ${payment?.label || paymentMethod}`,
+        notes: "Paid with Zelle; staff confirmation may be needed",
         status: "waiting",
         position: Number(firstResponse.position || 1)
       });
       setForm(defaultForm());
       setCart([]);
-      setPaymentMethod("");
+      setPaymentStarted(false);
       setShowDonation(true);
       setShowReadyAlertPrompt(true);
     } catch {
@@ -2117,29 +2130,22 @@ function CustomerPage() {
                 </div>
 
                 <div className="paymentBox">
-                  {lbl("Payment", "(required before checkout)")}
-                  <p className="paymentNote">The app records your selected method, but staff may still ask to see your Venmo or Zelle confirmation.</p>
-                  <div className="paymentChoices">
-                    {PAYMENT_OPTIONS.map(option => (
-                      <button
-                        key={option.id}
-                        className={paymentMethod === option.id ? "paymentChoice active" : "paymentChoice"}
-                        onClick={() => {
-                          setPaymentMethod(option.id);
-                          setErrors(er => ({ ...er, payment: "" }));
-                        }}
-                      >
-                        <strong>{option.label}</strong>
-                        <span>{option.detail}</span>
-                      </button>
-                    ))}
+                  {lbl("Payment", "(Zelle required before order is sent)")}
+                  <p className="paymentNote">The app cannot verify Zelle automatically. It sends the order after you return and confirm that you paid.</p>
+                  <div className="paymentChoices single">
+                    <button
+                      className={paymentStarted ? "paymentChoice active" : "paymentChoice"}
+                      onClick={startZellePayment}
+                    >
+                      <strong>{paymentStarted ? "Zelle opened" : "Go to Zelle"}</strong>
+                      <span>{ZELLE_PAYMENT_URL ? "Open payment link" : DONATION_ZELLE}</span>
+                    </button>
                   </div>
-                  {paymentMethod === "venmo" && <a className="paymentLink" href={DONATION_VENMO_URL} target="_blank" rel="noreferrer">Open Venmo</a>}
-                  {paymentMethod === "zelle" && <div className="paymentLink static">Send Zelle to {DONATION_ZELLE}</div>}
+                  <div className="paymentLink static">{paymentStarted ? "After paying, tap the checkout button below." : `Send Zelle to ${DONATION_ZELLE}`}</div>
                   {errors.payment && <div className="errorText">{errors.payment}</div>}
                 </div>
 
-                <button disabled={busy || cart.length === 0} className="joinBtn" onClick={submit}>{busy ? "Checking out..." : "Checkout and Join Queue"}</button>
+                <button disabled={busy || cart.length === 0} className="joinBtn" onClick={paymentStarted ? submit : startZellePayment}>{busy ? "Checking out..." : paymentStarted ? "I paid, place order" : "Go to Zelle"}</button>
               </div>
             </>
           )}
