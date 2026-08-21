@@ -48,6 +48,7 @@ create table if not exists menu_drinks (
   has_milk boolean not null default true,
   has_syrups boolean not null default true,
   show_temp boolean not null default true,
+  price numeric not null default 5,
   active boolean not null default true,
   sort_order integer not null default 0,
   updated_at timestamptz not null default now()
@@ -60,6 +61,7 @@ alter table menu_drinks add column if not exists temps text[] not null default a
 alter table menu_drinks add column if not exists has_milk boolean not null default true;
 alter table menu_drinks add column if not exists has_syrups boolean not null default true;
 alter table menu_drinks add column if not exists show_temp boolean not null default true;
+alter table menu_drinks add column if not exists price numeric not null default 5;
 alter table menu_drinks add column if not exists active boolean not null default true;
 alter table menu_drinks add column if not exists sort_order integer not null default 0;
 alter table menu_drinks add column if not exists updated_at timestamptz not null default now();
@@ -119,6 +121,7 @@ create table if not exists finance_items (
   units_on_hand numeric not null default 0,
   servings_per_unit numeric not null default 1,
   unit_cost numeric not null default 0,
+  waste_servings numeric not null default 0,
   active boolean not null default true,
   sort_order integer not null default 0,
   updated_at timestamptz not null default now()
@@ -129,6 +132,7 @@ alter table finance_items add column if not exists category text not null defaul
 alter table finance_items add column if not exists units_on_hand numeric not null default 0;
 alter table finance_items add column if not exists servings_per_unit numeric not null default 1;
 alter table finance_items add column if not exists unit_cost numeric not null default 0;
+alter table finance_items add column if not exists waste_servings numeric not null default 0;
 alter table finance_items add column if not exists active boolean not null default true;
 alter table finance_items add column if not exists sort_order integer not null default 0;
 alter table finance_items add column if not exists updated_at timestamptz not null default now();
@@ -209,23 +213,43 @@ from (
 where inventory.item = ranked.item
   and inventory.sort_order = 0;
 
-insert into menu_drinks (id, label, description, category, temps, has_milk, has_syrups, show_temp, active, sort_order) values
-('americano','Americano','No milk, water only','coffee',array['Hot','Cold'],false,true,true,true,0),
-('latte','Latte','Standard milk and coffee drink','coffee',array['Hot','Cold'],true,true,true,true,1),
-('cappuccino','Cappuccino','More milk foam','coffee',array['Hot','Cold'],true,true,true,true,2),
-('cortado','Cortado','More coffee forward, less milk','coffee',array['Hot'],true,true,true,true,3),
-('espresso','Double Shot Espresso','Pure espresso; no milk, water, or syrup','coffee',array['Hot'],false,false,true,true,4),
-('strawberry-refresher','Strawberry Refresher','Iced fruit refresher','refresher',array['Cold'],false,false,false,true,5),
-('mango-refresher','Mango Refresher','Iced fruit refresher','refresher',array['Cold'],false,false,false,true,6),
-('strawberry-banana-smoothie','Strawberry Banana Smoothie','Blended smoothie','smoothie',array['Cold'],false,false,false,true,7),
-('mango-smoothie','Mango Smoothie','Blended smoothie','smoothie',array['Cold'],false,false,false,true,8),
-('water','Water','Bottled water','drink',array['Cold'],false,false,false,true,9),
-('soda','Soda','Canned soda','drink',array['Cold'],false,false,false,true,10),
-('juice','Juice','Bottled juice','drink',array['Cold'],false,false,false,true,11),
-('small-snack','Small Snack','Small snack item','small-snack',array['Cold'],false,false,false,true,12),
-('big-snack','Big Snack','Big snack item','big-snack',array['Cold'],false,false,false,true,13),
-('light-meal','Light Meal','Light meal item','light-meal',array['Cold'],false,false,false,true,14)
+insert into menu_drinks (id, label, description, category, temps, has_milk, has_syrups, show_temp, price, active, sort_order) values
+('americano','Americano','No milk, water only','coffee',array['Hot','Cold'],false,true,true,5,true,0),
+('latte','Latte','Standard milk and coffee drink','coffee',array['Hot','Cold'],true,true,true,5,true,1),
+('cappuccino','Cappuccino','More milk foam','coffee',array['Hot','Cold'],true,true,true,5,true,2),
+('cortado','Cortado','More coffee forward, less milk','coffee',array['Hot'],true,true,true,5,true,3),
+('espresso','Double Shot Espresso','Pure espresso; no milk, water, or syrup','coffee',array['Hot'],false,false,true,5,true,4),
+('strawberry-refresher','Strawberry Refresher','Iced fruit refresher','refresher',array['Cold'],false,false,false,5,true,5),
+('mango-refresher','Mango Refresher','Iced fruit refresher','refresher',array['Cold'],false,false,false,5,true,6),
+('strawberry-banana-smoothie','Strawberry Banana Smoothie','Blended smoothie','smoothie',array['Cold'],false,false,false,5,true,7),
+('mango-smoothie','Mango Smoothie','Blended smoothie','smoothie',array['Cold'],false,false,false,5,true,8),
+('water','Water','Bottled water','drink',array['Cold'],false,false,false,3,true,9),
+('soda','Soda','Canned soda','drink',array['Cold'],false,false,false,3,true,10),
+('juice-bottle','Juice Bottle','Bottled juice','drink',array['Cold'],false,false,false,3,true,11),
+('juice-box','Juice Box','Boxed juice','drink',array['Cold'],false,false,false,2,true,12),
+('small-snack','Small Snack','Small snack item','snack',array['Cold'],false,false,false,1,true,13),
+('big-snack','Big Snack','Big snack item','snack',array['Cold'],false,false,false,2,true,14),
+('light-meal','Light Meal','Light meal item','snack',array['Cold'],false,false,false,3,true,15)
 on conflict (id) do nothing;
+
+update menu_drinks
+set active = false
+where id = 'juice';
+
+update menu_drinks
+set category = 'snack', price = case id when 'small-snack' then 1 when 'big-snack' then 2 when 'light-meal' then 3 else price end
+where id in ('small-snack', 'big-snack', 'light-meal');
+
+update menu_drinks
+set price = case
+  when id = 'juice-box' then 2
+  when id in ('water', 'soda', 'juice-bottle') then 3
+  when id = 'small-snack' then 1
+  when id = 'big-snack' then 2
+  when id = 'light-meal' then 3
+  when category in ('coffee', 'refresher', 'smoothie') then 5
+  else price
+end;
 
 insert into settings (key, value) values
 ('pin','"1972"')
@@ -381,6 +405,7 @@ as $$
         'milk', has_milk,
         'syrups', has_syrups,
         'showTemp', show_temp,
+        'price', price,
         'active', active,
         'sortOrder', sort_order
       )
@@ -829,6 +854,7 @@ begin
       has_milk,
       has_syrups,
       show_temp,
+      price,
       active,
       sort_order
     ) values (
@@ -836,13 +862,14 @@ begin
       left(coalesce(nullif(trim(drink_item->>'label'), ''), 'Drink'), 80),
       left(coalesce(drink_item->>'desc', ''), 180),
       case
-        when lower(coalesce(drink_item->>'category', 'coffee')) in ('coffee', 'refresher', 'smoothie', 'drink', 'small-snack', 'big-snack', 'light-meal') then lower(coalesce(drink_item->>'category', 'coffee'))
+        when lower(coalesce(drink_item->>'category', 'coffee')) in ('coffee', 'refresher', 'smoothie', 'drink', 'snack') then lower(coalesce(drink_item->>'category', 'coffee'))
         else 'coffee'
       end,
       cleaned_temps,
       coalesce((drink_item->>'milk')::boolean, true),
       coalesce((drink_item->>'syrups')::boolean, true),
       coalesce((drink_item->>'showTemp')::boolean, true),
+      greatest(0, coalesce(nullif(drink_item->>'price', '')::numeric, 5)),
       coalesce((drink_item->>'active')::boolean, true),
       drink_index
     )
@@ -854,6 +881,7 @@ begin
       has_milk = excluded.has_milk,
       has_syrups = excluded.has_syrups,
       show_temp = excluded.show_temp,
+      price = excluded.price,
       active = excluded.active,
       sort_order = excluded.sort_order,
       updated_at = now();
@@ -1201,10 +1229,10 @@ as $$
     select
       fi.*,
       coalesce(ur.used, 0) as used_servings,
-      greatest(0, (fi.units_on_hand * fi.servings_per_unit) - coalesce(ur.used, 0)) as remaining_servings,
+      greatest(0, (fi.units_on_hand * fi.servings_per_unit) - coalesce(ur.used, 0) - coalesce(fi.waste_servings, 0)) as remaining_servings,
       case
         when fi.servings_per_unit <= 0 then 0
-        else greatest(0, (fi.units_on_hand * fi.servings_per_unit) - coalesce(ur.used, 0)) / fi.servings_per_unit * fi.unit_cost
+        else greatest(0, (fi.units_on_hand * fi.servings_per_unit) - coalesce(ur.used, 0) - coalesce(fi.waste_servings, 0)) / fi.servings_per_unit * fi.unit_cost
       end as remaining_value
     from finance_items fi
     left join usage_rows ur on ur.id = fi.id
@@ -1215,6 +1243,7 @@ as $$
       category,
       sum(units_on_hand * servings_per_unit) as capacity,
       sum(used_servings) as used,
+      sum(waste_servings) as waste,
       sum(remaining_servings) as remaining,
       sum(remaining_value) as remaining_value
     from item_rows
@@ -1232,6 +1261,7 @@ as $$
         'servingsPerUnit', servings_per_unit,
         'unitCost', unit_cost,
         'usedServings', used_servings,
+        'wasteServings', waste_servings,
         'remainingServings', remaining_servings,
         'remainingValue', remaining_value,
         'sortOrder', sort_order
@@ -1240,6 +1270,7 @@ as $$
         'category', category,
         'capacity', capacity,
         'used', used,
+        'waste', waste,
         'remaining', remaining,
         'remainingValue', remaining_value
       ) order by category) from totals), '[]'::jsonb)
@@ -1274,6 +1305,7 @@ begin
       units_on_hand = greatest(0, coalesce(nullif(supply_item->>'unitsOnHand', '')::numeric, 0)),
       servings_per_unit = greatest(0, coalesce(nullif(supply_item->>'servingsPerUnit', '')::numeric, 1)),
       unit_cost = greatest(0, coalesce(nullif(supply_item->>'unitCost', '')::numeric, 0)),
+      waste_servings = greatest(0, coalesce(nullif(supply_item->>'wasteServings', '')::numeric, 0)),
       updated_at = now()
     where id = supply_item->>'id';
   end loop;

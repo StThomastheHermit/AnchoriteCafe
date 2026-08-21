@@ -19,9 +19,7 @@ const MENU_CATEGORIES = [
   { id: "refresher", label: "Refreshers" },
   { id: "smoothie", label: "Smoothies" },
   { id: "drink", label: "Soda / Water / Juice" },
-  { id: "small-snack", label: "Small Snacks" },
-  { id: "big-snack", label: "Big Snacks" },
-  { id: "light-meal", label: "Light Meals" },
+  { id: "snack", label: "Snacks / Light Meals" },
 ];
 
 const MENU_PRICES = {
@@ -29,9 +27,7 @@ const MENU_PRICES = {
   refresher: 5,
   smoothie: 5,
   drink: 3,
-  "small-snack": 1,
-  "big-snack": 2,
-  "light-meal": 3,
+  snack: 1,
 };
 
 const DRINKS = [
@@ -46,10 +42,11 @@ const DRINKS = [
   { id: "mango-smoothie", label: "Mango Smoothie", desc: "Blended smoothie", category: "smoothie", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
   { id: "water", label: "Water", desc: "Bottled water", category: "drink", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
   { id: "soda", label: "Soda", desc: "Canned soda", category: "drink", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
-  { id: "juice", label: "Juice", desc: "Bottled juice", category: "drink", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
-  { id: "small-snack", label: "Small Snack", desc: "Small snack item", category: "small-snack", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
-  { id: "big-snack", label: "Big Snack", desc: "Big snack item", category: "big-snack", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
-  { id: "light-meal", label: "Light Meal", desc: "Light meal item", category: "light-meal", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
+  { id: "juice-bottle", label: "Juice Bottle", desc: "Bottled juice", category: "drink", temps: ["Cold"], milk: false, syrups: false, showTemp: false, price: 3 },
+  { id: "juice-box", label: "Juice Box", desc: "Boxed juice", category: "drink", temps: ["Cold"], milk: false, syrups: false, showTemp: false, price: 2 },
+  { id: "small-snack", label: "Small Snack", desc: "Small snack item", category: "snack", temps: ["Cold"], milk: false, syrups: false, showTemp: false, price: 1 },
+  { id: "big-snack", label: "Big Snack", desc: "Big snack item", category: "snack", temps: ["Cold"], milk: false, syrups: false, showTemp: false, price: 2 },
+  { id: "light-meal", label: "Light Meal", desc: "Light meal item", category: "snack", temps: ["Cold"], milk: false, syrups: false, showTemp: false, price: 3 },
 ];
 
 const MILKS = ["Whole milk", "Almond milk", "Oat milk", "Soy milk"];
@@ -82,6 +79,7 @@ function normalizeDrinkItem(drink, index = 0) {
     syrups: Boolean(drink?.syrups),
     toppings: Boolean(drink?.toppings) || normalizeDrinkCategory(drink) === "refresher",
     showTemp: drink?.showTemp === false ? false : true,
+    price: Number.isFinite(Number(drink?.price)) ? Number(drink.price) : priceForCategory(normalizeDrinkCategory(drink)),
     active: drink?.active !== false,
     sortOrder: Number.isFinite(Number(drink?.sortOrder)) ? Number(drink.sortOrder) : index,
   };
@@ -93,15 +91,17 @@ function normalizeDrinkCategory(drink) {
   const text = `${drink?.id || ""} ${drink?.label || ""}`.toLowerCase();
   if (text.includes("refresh")) return "refresher";
   if (text.includes("smoothie")) return "smoothie";
-  if (text.includes("small snack")) return "small-snack";
-  if (text.includes("big snack")) return "big-snack";
-  if (text.includes("light meal")) return "light-meal";
+  if (text.includes("snack") || text.includes("meal")) return "snack";
   if (text.includes("soda") || text.includes("water") || text.includes("juice")) return "drink";
   return "coffee";
 }
 
 function priceForCategory(category) {
   return MENU_PRICES[category] || 5;
+}
+
+function priceForDrink(drink) {
+  return Number.isFinite(Number(drink?.price)) ? Number(drink.price) : priceForCategory(drink?.category);
 }
 
 function categoryCanHaveIce(category) {
@@ -969,6 +969,7 @@ function AdminPage() {
       milk: true,
       syrups: true,
       showTemp: true,
+      price: 5,
       active: true,
       sortOrder: nextIndex,
     }, nextIndex)]);
@@ -1273,7 +1274,7 @@ function AdminPage() {
                 <div key={total.category}>
                   <span>{total.category}</span>
                   <strong>{formatCount(total.used)} used</strong>
-                  <em>{formatCount(total.capacity)} capacity · {formatCurrency(total.remainingValue)} left</em>
+                  <em>{formatCount(total.waste)} waste · {formatCount(total.capacity)} capacity · {formatCurrency(total.remainingValue)} left</em>
                 </div>
               ))}
             </div>
@@ -1286,6 +1287,7 @@ function AdminPage() {
                 <span>Serves/unit</span>
                 <span>Cost/unit</span>
                 <span>Used</span>
+                <span>Waste</span>
                 <span>Remaining</span>
                 <span>Value left</span>
               </div>
@@ -1313,6 +1315,11 @@ function AdminPage() {
                     inputMode="decimal"
                   />
                   <span>{formatCount(item.usedServings)}</span>
+                  <input
+                    value={item.wasteServings ?? 0}
+                    onChange={e => updateFinanceItem(item.id, { wasteServings: e.target.value })}
+                    inputMode="decimal"
+                  />
                   <span className={Number(item.remainingServings || 0) <= 5 ? "financeLow" : ""}>{formatCount(item.remainingServings)}</span>
                   <span>{formatCurrency(item.remainingValue)}</span>
                 </div>
@@ -1658,6 +1665,10 @@ function MenuEditor({
                 <label>
                   <span className="label">Name</span>
                   <input value={drink.label} disabled={staffMode} onChange={e => onUpdate(drink.id, { label: e.target.value })} placeholder="Drink name" />
+                </label>
+                <label>
+                  <span className="label">Price</span>
+                  <input value={drink.price} disabled={staffMode} onChange={e => onUpdate(drink.id, { price: e.target.value })} inputMode="decimal" placeholder="Price" />
                 </label>
                 <label>
                   <span className="label">Description</span>
@@ -2148,7 +2159,7 @@ function CustomerPage() {
       syrups: drink.syrups ? form.syrups : [],
       toppings,
       lightIce: categoryCanHaveIce(drink.category) && temp === "Cold" && form.lightIce,
-      price: priceForCategory(drink.category),
+      price: priceForDrink(drink),
       notes: form.notes.trim(),
     };
   }
@@ -2425,7 +2436,7 @@ function CustomerPage() {
                 <div className="drinkGroups">
                   {drinksByCategory.map(category => (
                     <div className="drinkGroup" key={category.id}>
-                      <h3>{category.label} <span>{formatPrice(priceForCategory(category.id))}</span></h3>
+                      <h3>{category.label} <span>{category.items.some(item => Number(item.price) !== priceForCategory(category.id)) ? "priced by item" : formatPrice(priceForCategory(category.id))}</span></h3>
                       <div className="drinkList">
                         {category.drinks.map(d => (
                           <button key={d.id} className={form.drinkId === d.id ? "drink active" : "drink"} onClick={() => setForm(f => ({...f, drinkId: d.id}))}>
