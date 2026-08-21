@@ -6,25 +6,39 @@ import { getPushDeviceHint, getPushSupportStatus, isAppleTouchDevice, isStandalo
 
 const DONATION_VENMO_URL = "https://account.venmo.com/u/HolyTransfiguration-OrthodoxCh";
 const DONATION_ZELLE = "htacoc@gmail.com";
+const PAYMENT_OPTIONS = [
+  { id: "venmo", label: "Venmo", detail: "@HolyTransfiguration-OrthodoxCh", url: DONATION_VENMO_URL },
+  { id: "zelle", label: "Zelle", detail: DONATION_ZELLE },
+];
 const INVENTORY_CACHE_KEY = "arise-inventory-cache";
 const INVENTORY_CACHE_MS = 5 * 60 * 1000;
 const TEXT_SIZE_KEY = "arise-text-size";
 const LAST_ORDER_KEY = "arise-last-order";
 const LAST_ORDER_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
+const MENU_CATEGORIES = [
+  { id: "coffee", label: "Coffees" },
+  { id: "refresher", label: "Refreshers" },
+  { id: "smoothie", label: "Smoothies" },
+];
+
 const DRINKS = [
-  { id: "americano", label: "Americano", desc: "No milk, water only", temps: ["Hot", "Cold"], milk: false, syrups: true },
-  { id: "latte", label: "Latte", desc: "Standard milk and coffee drink", temps: ["Hot", "Cold"], milk: true, syrups: true },
-  { id: "cappuccino", label: "Cappuccino", desc: "More milk foam", temps: ["Hot", "Cold"], milk: true, syrups: true },
-  { id: "cortado", label: "Cortado", desc: "More coffee forward, less milk", temps: ["Hot"], milk: true, syrups: true },
-  { id: "espresso", label: "Double Shot Espresso", desc: "Pure espresso — no milk, water or syrup", temps: ["Hot"], milk: false, syrups: false },
-  { id: "hotchoc", label: "Hot Chocolate", desc: "Rich hot chocolate", temps: ["Hot"], milk: true, syrups: false },
-  { id: "coldchoc", label: "Cold Chocolate Milk", desc: "Chilled chocolate milk", temps: ["Cold"], milk: true, syrups: false, showTemp: false },
+  { id: "americano", label: "Americano", desc: "No milk, water only", category: "coffee", temps: ["Hot", "Cold"], milk: false, syrups: true },
+  { id: "latte", label: "Latte", desc: "Standard milk and coffee drink", category: "coffee", temps: ["Hot", "Cold"], milk: true, syrups: true },
+  { id: "cappuccino", label: "Cappuccino", desc: "More milk foam", category: "coffee", temps: ["Hot", "Cold"], milk: true, syrups: true },
+  { id: "cortado", label: "Cortado", desc: "More coffee forward, less milk", category: "coffee", temps: ["Hot"], milk: true, syrups: true },
+  { id: "espresso", label: "Double Shot Espresso", desc: "Pure espresso; no milk, water, or syrup", category: "coffee", temps: ["Hot"], milk: false, syrups: false },
+  { id: "strawberry-refresher", label: "Strawberry Refresher", desc: "Iced fruit refresher", category: "refresher", temps: ["Cold"], milk: false, syrups: false, toppings: true, showTemp: false },
+  { id: "mango-refresher", label: "Mango Refresher", desc: "Iced fruit refresher", category: "refresher", temps: ["Cold"], milk: false, syrups: false, toppings: true, showTemp: false },
+  { id: "strawberry-banana-smoothie", label: "Strawberry Banana Smoothie", desc: "Blended smoothie", category: "smoothie", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
+  { id: "mango-smoothie", label: "Mango Smoothie", desc: "Blended smoothie", category: "smoothie", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
 ];
 
 const MILKS = ["Whole milk", "Almond milk", "Oat milk", "Soy milk"];
 const SYRUPS = ["Caramel", "Sugar Free Caramel", "Vanilla", "Sugar Free Vanilla", "Mocha", "White Chocolate", "Honey", "Cinnamon Powder", "Hazelnut"];
+const REFRESHER_TOPPINGS = ["Strawberry Popping Boba", "Mango Popping Boba", "Peach Popping Boba", "Fresh Strawberry", "Lemon Slice"];
 const MAX_SYRUPS = 2;
+const MAX_REFRESHER_TOPPINGS = 3;
 
 function makeDrinkId(label) {
   const base = String(label || "")
@@ -44,13 +58,24 @@ function normalizeDrinkItem(drink, index = 0) {
     id: String(drink?.id || makeDrinkId(drink?.label || `Drink ${index + 1}`)),
     label: String(drink?.label || "Drink").trim() || "Drink",
     desc: String(drink?.desc || "").trim(),
+    category: normalizeDrinkCategory(drink),
     temps: temps.length ? [...new Set(temps)] : ["Hot"],
     milk: Boolean(drink?.milk),
     syrups: Boolean(drink?.syrups),
+    toppings: Boolean(drink?.toppings) || normalizeDrinkCategory(drink) === "refresher",
     showTemp: drink?.showTemp === false ? false : true,
     active: drink?.active !== false,
     sortOrder: Number.isFinite(Number(drink?.sortOrder)) ? Number(drink.sortOrder) : index,
   };
+}
+
+function normalizeDrinkCategory(drink) {
+  const raw = String(drink?.category || "").toLowerCase();
+  if (MENU_CATEGORIES.some(category => category.id === raw)) return raw;
+  const text = `${drink?.id || ""} ${drink?.label || ""}`.toLowerCase();
+  if (text.includes("refresh")) return "refresher";
+  if (text.includes("smoothie")) return "smoothie";
+  return "coffee";
 }
 
 function normalizeMenuDrinks(drinks, includeInactive = false) {
@@ -106,7 +131,7 @@ function getDrink(id, drinks = DRINKS) {
 }
 
 function defaultForm() {
-  return { name: "", drinkId: "latte", temp: "Hot", milk: "", syrups: [], notes: "" };
+  return { name: "", drinkId: "latte", temp: "Hot", milk: "", syrups: [], toppings: [], notes: "" };
 }
 
 function defaultInventory() {
@@ -1161,6 +1186,19 @@ function MenuEditor({
     });
   }
 
+  function updateCategory(drink, category) {
+    const isRefresher = category === "refresher";
+    const isCoffee = category === "coffee";
+    onUpdate(drink.id, {
+      category,
+      milk: isCoffee ? drink.milk : false,
+      syrups: isCoffee ? drink.syrups : false,
+      toppings: isRefresher,
+      temps: isCoffee ? drink.temps : ["Cold"],
+      showTemp: isCoffee ? drink.showTemp : false,
+    });
+  }
+
   return (
     <section className="menuPanel">
       <div className="menuSectionCard">
@@ -1212,6 +1250,21 @@ function MenuEditor({
 
               <div className="menuCardControls">
                 <div>
+                  <div className="label">Category</div>
+                  <div className="menuTempRow">
+                    {MENU_CATEGORIES.map(category => (
+                      <button
+                        key={category.id}
+                        className={drink.category === category.id ? "choice active" : "choice"}
+                        onClick={() => updateCategory(drink, category.id)}
+                      >
+                        {category.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
                   <div className="label">Temperature</div>
                   <div className="menuTempRow">
                     <button className={drink.temps.includes("Hot") ? "choice active" : "choice"} onClick={() => toggleTemp(drink, "Hot")}>Hot</button>
@@ -1229,6 +1282,10 @@ function MenuEditor({
                     <label className="adminCheck">
                       <input type="checkbox" checked={drink.syrups} onChange={e => onUpdate(drink.id, { syrups: e.target.checked })} />
                       Allows syrup
+                    </label>
+                    <label className="adminCheck">
+                      <input type="checkbox" checked={drink.category === "refresher"} disabled />
+                      Refresher toppings
                     </label>
                     <label className="adminCheck">
                       <input type="checkbox" checked={drink.showTemp !== false && drink.temps.length > 1} disabled={drink.temps.length < 2} onChange={e => onUpdate(drink.id, { showTemp: e.target.checked })} />
@@ -1447,6 +1504,8 @@ function CustomerPage() {
   const [myOrder, setMyOrder] = useState(null);
   const [myOrderPosition, setMyOrderPosition] = useState(1);
   const [busy, setBusy] = useState(false);
+  const [cart, setCart] = useState([]);
+  const [paymentMethod, setPaymentMethod] = useState("");
   const [showDonation, setShowDonation] = useState(false);
   const [showReadyAlertPrompt, setShowReadyAlertPrompt] = useState(false);
   const [readyAlertShown, setReadyAlertShown] = useState(false);
@@ -1463,6 +1522,10 @@ function CustomerPage() {
   const nameRef = useRef(null);
 
   const customerDrinks = useMemo(() => normalizeMenuDrinks(menuDrinks), [menuDrinks]);
+  const drinksByCategory = useMemo(() => MENU_CATEGORIES.map(category => ({
+    ...category,
+    drinks: customerDrinks.filter(d => d.category === category.id),
+  })).filter(category => category.drinks.length), [customerDrinks]);
   const drink = useMemo(() => getDrink(form.drinkId, customerDrinks), [form.drinkId, customerDrinks]);
   const inventoryLookup = useMemo(() => buildInventoryLookup(inventory), [inventory]);
   const customerMilks = useMemo(() => inventoryItemsByType(inventory, "milk", MILKS).filter(item => item.available !== false), [inventory]);
@@ -1608,6 +1671,7 @@ function CustomerPage() {
       temp: pending?.temp || d.temps[0],
       milk: pending?.milk || "",
       syrups: pending?.syrups || [],
+      toppings: pending?.toppings || [],
       notes: pending?.notes ?? f.notes,
     }));
     setErrors({});
@@ -1627,6 +1691,39 @@ function CustomerPage() {
     });
   }
 
+  function toggleTopping(topping) {
+    setForm(f => {
+      const current = Array.isArray(f.toppings) ? f.toppings : [];
+      if (current.includes(topping)) return { ...f, toppings: current.filter(x => x !== topping) };
+      if (current.length >= MAX_REFRESHER_TOPPINGS) return f;
+      return { ...f, toppings: [...current, topping] };
+    });
+  }
+
+  function describeCartItem(item) {
+    const parts = [item.temp, item.drink].filter(Boolean);
+    if (item.milk) parts.push(item.milk);
+    if (item.syrups.length) parts.push(item.syrups.join(", "));
+    if (item.toppings.length) parts.push(item.toppings.join(", "));
+    return parts.join(" · ");
+  }
+
+  function buildCartItem() {
+    const toppings = drink.category === "refresher" ? (form.toppings || []) : [];
+    return {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      name: form.name.trim(),
+      drink: drink.label,
+      drinkId: form.drinkId,
+      category: drink.category,
+      temp: drink.showTemp === false ? drink.temps[0] : form.temp,
+      milk: drink.milk ? form.milk : "",
+      syrups: drink.syrups ? form.syrups : [],
+      toppings,
+      notes: form.notes.trim(),
+    };
+  }
+
   function validate() {
     const e = {};
     if (!customerDrinks.some(d => d.id === form.drinkId)) e.drink = "That drink is not available today";
@@ -1637,6 +1734,37 @@ function CustomerPage() {
     const outSyrup = form.syrups.find(s => !isInventoryAvailable(inventoryLookup, s));
     if (outSyrup) e.syrups = outSyrup + " is out of stock";
     return e;
+  }
+
+  function validateCheckout() {
+    const e = {};
+    if (!cart.length) e.cart = "Add at least one item to your cart";
+    if (!paymentMethod) e.payment = "Choose Venmo or Zelle before checkout";
+    return e;
+  }
+
+  function addToCart() {
+    const e = validate();
+    if (Object.keys(e).length) {
+      setErrors(e);
+      if (e.name) nameRef.current?.focus();
+      return;
+    }
+
+    const item = buildCartItem();
+    setCart(current => [...current, item]);
+    localStorage.setItem("arise-customer-name", item.name);
+    setForm(f => ({
+      ...defaultForm(),
+      name: f.name,
+      drinkId: f.drinkId,
+      temp: drink.temps[0],
+    }));
+    setErrors({});
+  }
+
+  function removeCartItem(id) {
+    setCart(current => current.filter(item => item.id !== id));
   }
 
   function useLastOrder() {
@@ -1673,64 +1801,79 @@ function CustomerPage() {
       return;
     }
 
-    const e = validate();
+    const e = validateCheckout();
     if (Object.keys(e).length) {
       setErrors(e);
-      if (e.name) nameRef.current?.focus();
       setBusy(false);
       submittingRef.current = false;
       return;
     }
 
     try {
-      const data = await apiPost({
-        action: "order",
-        name: form.name.trim(),
-        drink: drink.label,
-        drinkId: form.drinkId,
-        temp: form.temp,
-        milk: form.milk,
-        syrups: form.syrups,
-        notes: form.notes,
-      });
+      const payment = PAYMENT_OPTIONS.find(option => option.id === paymentMethod);
+      const placed = [];
+      for (let index = 0; index < cart.length; index += 1) {
+        const item = cart[index];
+        const noteParts = [
+          `Cart item ${index + 1} of ${cart.length}`,
+          `Payment: ${payment?.label || paymentMethod}`,
+          item.toppings.length ? `Refresher toppings: ${item.toppings.join(", ")}` : "",
+          item.notes,
+        ].filter(Boolean);
+        const data = await apiPost({
+          action: "order",
+          name: item.name,
+          drink: item.drink,
+          drinkId: item.drinkId,
+          temp: item.temp,
+          milk: item.milk,
+          syrups: item.syrups,
+          notes: noteParts.join(" | "),
+        });
 
-      if (!data.ok) {
-        alert(data.error || "Could not place order");
-        await refreshStatusOnly();
-        setBusy(false);
-        submittingRef.current = false;
-        return;
+        if (!data.ok) {
+          alert(data.error || "Could not place order");
+          await refreshStatusOnly();
+          setBusy(false);
+          submittingRef.current = false;
+          return;
+        }
+        placed.push({ ...item, response: data });
       }
 
-      localStorage.setItem("arise-customer-name", form.name.trim());
-      localStorage.setItem("coffee-my-order-id", data.id);
+      const first = placed[0];
+      const firstResponse = first.response;
+      localStorage.setItem("arise-customer-name", first.name);
+      localStorage.setItem("coffee-my-order-id", firstResponse.id);
       const savedOrder = {
-        drinkId: form.drinkId,
-        drinkLabel: drink.label,
-        temp: form.temp,
-        milk: form.milk,
-        syrups: form.syrups,
-        notes: form.notes,
+        drinkId: first.drinkId,
+        drinkLabel: first.drink,
+        temp: first.temp,
+        milk: first.milk,
+        syrups: first.syrups,
+        notes: first.notes,
         expiresAt: Date.now() + LAST_ORDER_TTL_MS,
       };
       localStorage.setItem(LAST_ORDER_KEY, JSON.stringify(savedOrder));
       setLastOrder(savedOrder);
       setReadyAlertShown(false);
       previousStatusRef.current = "waiting";
-      setMyOrderId(data.id);
-      setMyOrderPosition(Number(data.position || 1));
+      setMyOrderId(firstResponse.id);
+      setMyOrderPosition(Number(firstResponse.position || 1));
       setMyOrder({
-        id: data.id,
-        name: form.name.trim(),
-        drink: drink.label,
-        temp: form.temp,
-        milk: form.milk,
-        syrups: form.syrups.join(", "),
-        notes: form.notes,
+        id: firstResponse.id,
+        name: first.name,
+        drink: placed.length > 1 ? `${first.drink} + ${placed.length - 1} more` : first.drink,
+        temp: first.temp,
+        milk: first.milk,
+        syrups: [...first.syrups, ...first.toppings].join(", "),
+        notes: `Paid with ${payment?.label || paymentMethod}`,
         status: "waiting",
-        position: Number(data.position || 1)
+        position: Number(firstResponse.position || 1)
       });
       setForm(defaultForm());
+      setCart([]);
+      setPaymentMethod("");
       setShowDonation(true);
       setShowReadyAlertPrompt(true);
     } catch {
@@ -1825,9 +1968,21 @@ function CustomerPage() {
               </div>
 
               <div className="field">
-                {lbl("Drink")}
-                <div className="drinkList">
-                  {customerDrinks.map(d => <button key={d.id} className={form.drinkId === d.id ? "drink active" : "drink"} onClick={() => setForm(f => ({...f, drinkId: d.id}))}><strong>{d.label}</strong><span>{d.desc}</span></button>)}
+                {lbl("Menu")}
+                <div className="drinkGroups">
+                  {drinksByCategory.map(category => (
+                    <div className="drinkGroup" key={category.id}>
+                      <h3>{category.label}</h3>
+                      <div className="drinkList">
+                        {category.drinks.map(d => (
+                          <button key={d.id} className={form.drinkId === d.id ? "drink active" : "drink"} onClick={() => setForm(f => ({...f, drinkId: d.id}))}>
+                            <strong>{d.label}</strong>
+                            <span>{d.desc}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
                 {errors.drink && <div className="errorText">{errors.drink}</div>}
               </div>
@@ -1879,6 +2034,25 @@ function CustomerPage() {
                 {errors.syrups && <div className="errorText">{errors.syrups}</div>}
               </div>}
 
+              {drink.category === "refresher" && <div className="field">
+                {lbl("Refresher toppings", `— pick up to ${MAX_REFRESHER_TOPPINGS}`)}
+                <div className="syrups">{REFRESHER_TOPPINGS.map(topping => {
+                  const selected = form.toppings.includes(topping);
+                  const maxed = !selected && form.toppings.length >= MAX_REFRESHER_TOPPINGS;
+                  return (
+                    <button
+                      key={topping}
+                      disabled={maxed}
+                      className={selected ? "syrup active" : "syrup"}
+                      onClick={() => toggleTopping(topping)}
+                    >
+                      {selected ? "✓ " : ""}{topping}
+                    </button>
+                  );
+                })}</div>
+                <div className="muted small">{form.toppings.length === 0 ? "No refresher toppings selected" : `${form.toppings.length}/${MAX_REFRESHER_TOPPINGS} selected`}</div>
+              </div>}
+
               {!drink.syrups && !drink.milk && <div className="servedOnly">Served as listed: <strong>{drink.label}</strong></div>}
 
               <div className="field">
@@ -1886,7 +2060,58 @@ function CustomerPage() {
                 <textarea value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} rows={2} placeholder="Any special requests?" />
               </div>
 
-              <button disabled={busy} className="joinBtn" onClick={submit}>{busy ? "Sending…" : "Join the Queue →"}</button>
+              <button disabled={busy} className="joinBtn" onClick={addToCart}>Add to Cart</button>
+
+              <div className="cartPanel">
+                <div className="cartHeader">
+                  <div>
+                    <h3>Cart</h3>
+                    <p>{cart.length ? `${cart.length} item${cart.length === 1 ? "" : "s"} ready for checkout` : "Add drinks before checkout"}</p>
+                  </div>
+                </div>
+
+                {cart.length === 0 ? (
+                  <div className="cartEmpty">Your cart is empty.</div>
+                ) : (
+                  <div className="cartItems">
+                    {cart.map((item, index) => (
+                      <div className="cartItem" key={item.id}>
+                        <div>
+                          <strong>{index + 1}. {item.drink}</strong>
+                          <p>{describeCartItem(item)}</p>
+                          {item.notes && <em>{item.notes}</em>}
+                        </div>
+                        <button className="plainBtn" onClick={() => removeCartItem(item.id)}>Remove</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {errors.cart && <div className="errorText">{errors.cart}</div>}
+
+                <div className="paymentBox">
+                  {lbl("Payment", "(required before checkout)")}
+                  <div className="paymentChoices">
+                    {PAYMENT_OPTIONS.map(option => (
+                      <button
+                        key={option.id}
+                        className={paymentMethod === option.id ? "paymentChoice active" : "paymentChoice"}
+                        onClick={() => {
+                          setPaymentMethod(option.id);
+                          setErrors(er => ({ ...er, payment: "" }));
+                        }}
+                      >
+                        <strong>{option.label}</strong>
+                        <span>{option.detail}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {paymentMethod === "venmo" && <a className="paymentLink" href={DONATION_VENMO_URL} target="_blank" rel="noreferrer">Open Venmo</a>}
+                  {paymentMethod === "zelle" && <div className="paymentLink static">Send Zelle to {DONATION_ZELLE}</div>}
+                  {errors.payment && <div className="errorText">{errors.payment}</div>}
+                </div>
+
+                <button disabled={busy || cart.length === 0} className="joinBtn" onClick={submit}>{busy ? "Checking out..." : "Checkout and Join Queue"}</button>
+              </div>
             </>
           )}
         </section>

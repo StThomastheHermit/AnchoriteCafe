@@ -43,6 +43,7 @@ create table if not exists menu_drinks (
   id text primary key,
   label text not null,
   description text not null default '',
+  category text not null default 'coffee',
   temps text[] not null default array['Hot','Cold'],
   has_milk boolean not null default true,
   has_syrups boolean not null default true,
@@ -54,6 +55,7 @@ create table if not exists menu_drinks (
 
 alter table menu_drinks add column if not exists label text;
 alter table menu_drinks add column if not exists description text not null default '';
+alter table menu_drinks add column if not exists category text not null default 'coffee';
 alter table menu_drinks add column if not exists temps text[] not null default array['Hot','Cold'];
 alter table menu_drinks add column if not exists has_milk boolean not null default true;
 alter table menu_drinks add column if not exists has_syrups boolean not null default true;
@@ -138,14 +140,16 @@ from (
 where inventory.item = ranked.item
   and inventory.sort_order = 0;
 
-insert into menu_drinks (id, label, description, temps, has_milk, has_syrups, show_temp, active, sort_order) values
-('americano','Americano','No milk, water only',array['Hot','Cold'],false,true,true,true,0),
-('latte','Latte','Standard milk and coffee drink',array['Hot','Cold'],true,true,true,true,1),
-('cappuccino','Cappuccino','More milk foam',array['Hot','Cold'],true,true,true,true,2),
-('cortado','Cortado','More coffee forward, less milk',array['Hot'],true,true,true,true,3),
-('espresso','Double Shot Espresso','Pure espresso — no milk, water or syrup',array['Hot'],false,false,true,true,4),
-('hotchoc','Hot Chocolate','Rich hot chocolate',array['Hot'],true,false,true,true,5),
-('coldchoc','Cold Chocolate Milk','Chilled chocolate milk',array['Cold'],true,false,false,true,6)
+insert into menu_drinks (id, label, description, category, temps, has_milk, has_syrups, show_temp, active, sort_order) values
+('americano','Americano','No milk, water only','coffee',array['Hot','Cold'],false,true,true,true,0),
+('latte','Latte','Standard milk and coffee drink','coffee',array['Hot','Cold'],true,true,true,true,1),
+('cappuccino','Cappuccino','More milk foam','coffee',array['Hot','Cold'],true,true,true,true,2),
+('cortado','Cortado','More coffee forward, less milk','coffee',array['Hot'],true,true,true,true,3),
+('espresso','Double Shot Espresso','Pure espresso; no milk, water, or syrup','coffee',array['Hot'],false,false,true,true,4),
+('strawberry-refresher','Strawberry Refresher','Iced fruit refresher','refresher',array['Cold'],false,false,false,true,5),
+('mango-refresher','Mango Refresher','Iced fruit refresher','refresher',array['Cold'],false,false,false,true,6),
+('strawberry-banana-smoothie','Strawberry Banana Smoothie','Blended smoothie','smoothie',array['Cold'],false,false,false,true,7),
+('mango-smoothie','Mango Smoothie','Blended smoothie','smoothie',array['Cold'],false,false,false,true,8)
 on conflict (id) do nothing;
 
 insert into settings (key, value) values
@@ -273,6 +277,7 @@ as $$
         'id', id,
         'label', label,
         'desc', description,
+        'category', category,
         'temps', to_jsonb(temps),
         'milk', has_milk,
         'syrups', has_syrups,
@@ -696,6 +701,7 @@ begin
       id,
       label,
       description,
+      category,
       temps,
       has_milk,
       has_syrups,
@@ -706,6 +712,10 @@ begin
       left(coalesce(nullif(trim(drink_item->>'id'), ''), 'drink-' || drink_index::text), 80),
       left(coalesce(nullif(trim(drink_item->>'label'), ''), 'Drink'), 80),
       left(coalesce(drink_item->>'desc', ''), 180),
+      case
+        when lower(coalesce(drink_item->>'category', 'coffee')) in ('coffee', 'refresher', 'smoothie') then lower(coalesce(drink_item->>'category', 'coffee'))
+        else 'coffee'
+      end,
       cleaned_temps,
       coalesce((drink_item->>'milk')::boolean, true),
       coalesce((drink_item->>'syrups')::boolean, true),
@@ -716,6 +726,7 @@ begin
     on conflict (id) do update set
       label = excluded.label,
       description = excluded.description,
+      category = excluded.category,
       temps = excluded.temps,
       has_milk = excluded.has_milk,
       has_syrups = excluded.has_syrups,
