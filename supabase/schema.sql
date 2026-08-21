@@ -27,7 +27,7 @@ alter table orders add column if not exists status text not null default 'waitin
 create table if not exists inventory (
   id uuid primary key default gen_random_uuid(),
   item text not null unique,
-  type text not null check (type in ('syrup', 'milk')),
+  type text not null check (type in ('syrup', 'milk', 'topping')),
   available boolean not null default true,
   active boolean not null default true,
   sort_order integer not null default 0
@@ -38,6 +38,9 @@ alter table inventory add column if not exists type text;
 alter table inventory add column if not exists available boolean not null default true;
 alter table inventory add column if not exists active boolean not null default true;
 alter table inventory add column if not exists sort_order integer not null default 0;
+
+alter table inventory drop constraint if exists inventory_type_check;
+alter table inventory add constraint inventory_type_check check (type in ('syrup', 'milk', 'topping'));
 
 create table if not exists menu_drinks (
   id text primary key,
@@ -180,6 +183,11 @@ insert into inventory (item, type, available) values
 ('Honey','syrup',true),
 ('Cinnamon Powder','syrup',true),
 ('Hazelnut','syrup',true),
+('Strawberry Popping Boba','topping',true),
+('Mango Popping Boba','topping',true),
+('Peach Popping Boba','topping',true),
+('Fresh Strawberry','topping',true),
+('Lemon Slice','topping',true),
 ('Almond milk','milk',true),
 ('Oat milk','milk',true),
 ('Soy milk','milk',true),
@@ -206,6 +214,11 @@ from (
         when 'Honey' then 6
         when 'Cinnamon Powder' then 7
         when 'Hazelnut' then 8
+        when 'Strawberry Popping Boba' then 0
+        when 'Mango Popping Boba' then 1
+        when 'Peach Popping Boba' then 2
+        when 'Fresh Strawberry' then 3
+        when 'Lemon Slice' then 4
         else 99
       end,
       item
@@ -358,6 +371,11 @@ as $$
       jsonb_agg(jsonb_build_object('item', item, 'type', 'milk', 'available', available, 'active', active, 'sortOrder', sort_order))
         filter (where type = 'milk'),
       '[]'::jsonb
+    ),
+    'toppings', coalesce(
+      jsonb_agg(jsonb_build_object('item', item, 'type', 'topping', 'available', available, 'active', active, 'sortOrder', sort_order))
+        filter (where type = 'topping'),
+      '[]'::jsonb
     )
   )
   from sorted;
@@ -388,6 +406,11 @@ as $$
     'milks', coalesce(
       jsonb_agg(jsonb_build_object('id', lower(regexp_replace(item, '[^a-zA-Z0-9]+', '-', 'g')), 'item', item, 'type', 'milk', 'available', available, 'active', active, 'sortOrder', sort_order))
         filter (where type = 'milk'),
+      '[]'::jsonb
+    ),
+    'toppings', coalesce(
+      jsonb_agg(jsonb_build_object('id', lower(regexp_replace(item, '[^a-zA-Z0-9]+', '-', 'g')), 'item', item, 'type', 'topping', 'available', available, 'active', active, 'sortOrder', sort_order))
+        filter (where type = 'topping'),
       '[]'::jsonb
     )
   )
@@ -897,7 +920,7 @@ begin
     drink_index := drink_index + 1;
   end loop;
 
-  delete from inventory where true;
+  delete from inventory where type in ('milk', 'syrup');
 
   ingredient_index := 0;
   for ingredient_item in
@@ -938,6 +961,7 @@ begin
     'drinks', arise_menu_json(true),
     'milks', arise_inventory_menu_json(true)->'milks',
     'syrups', arise_inventory_menu_json(true)->'syrups',
+    'toppings', arise_inventory_menu_json(true)->'toppings',
     'inventory', arise_inventory_json()
   );
 exception

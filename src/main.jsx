@@ -226,7 +226,11 @@ function inventoryItemsByType(inventory, type, fallback) {
 
 function buildInventoryLookup(inventory) {
   const lookup = {};
-  [...inventoryItemsByType(inventory, "syrup", SYRUPS), ...inventoryItemsByType(inventory, "milk", MILKS)].forEach(x => {
+  [
+    ...inventoryItemsByType(inventory, "syrup", SYRUPS),
+    ...inventoryItemsByType(inventory, "milk", MILKS),
+    ...inventoryItemsByType(inventory, "topping", REFRESHER_TOPPINGS),
+  ].forEach(x => {
     lookup[x.item] = x.available !== false;
   });
   return lookup;
@@ -522,6 +526,7 @@ function AdminPage() {
   const messageEditingRef = useRef(false);
   const adminSyrups = useMemo(() => inventoryItemsByType(inventory, "syrup", SYRUPS), [inventory]);
   const adminMilks = useMemo(() => inventoryItemsByType(inventory, "milk", MILKS), [inventory]);
+  const adminToppings = useMemo(() => inventoryItemsByType(inventory, "topping", REFRESHER_TOPPINGS), [inventory]);
   const isOwner = auth?.role === "owner";
   const isEmployee = auth?.role === "employee";
   const canWorkQueue = isOwner || isEmployee;
@@ -1609,6 +1614,23 @@ function AdminPage() {
               </div>
 
               <div className="inventoryGroup">
+                <div className="label">Refresher Toppings</div>
+                <div className="inventoryGrid">
+                  {adminToppings.map(x => (
+                    <button
+                      key={x.item}
+                      disabled={busy}
+                      className={x.available ? "inventoryToggle available" : "inventoryToggle out"}
+                      onClick={() => toggleInventory(x.item, !x.available)}
+                    >
+                      <span>{x.item}</span>
+                      <strong>{x.available ? "Available" : "Out of stock"}</strong>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="inventoryGroup">
                 <div className="label">Milks</div>
                 <div className="inventoryGrid">
                   {adminMilks.map(x => (
@@ -2034,6 +2056,7 @@ function CustomerPage() {
   const inventoryLookup = useMemo(() => buildInventoryLookup(inventory), [inventory]);
   const customerMilks = useMemo(() => inventoryItemsByType(inventory, "milk", MILKS).filter(item => item.available !== false), [inventory]);
   const customerSyrups = useMemo(() => inventoryItemsByType(inventory, "syrup", SYRUPS).filter(item => item.available !== false), [inventory]);
+  const customerToppings = useMemo(() => inventoryItemsByType(inventory, "topping", REFRESHER_TOPPINGS).filter(item => item.available !== false), [inventory]);
   const cartTotal = useMemo(() => cart.reduce((sum, item) => sum + Number(item.price || 0), 0), [cart]);
   const pushDeviceHint = useMemo(() => getPushDeviceHint(), []);
   const requiresIosInstall = useMemo(() => isAppleTouchDevice() && !isStandaloneApp(), []);
@@ -2255,6 +2278,8 @@ function CustomerPage() {
     if (form.milk && !isInventoryAvailable(inventoryLookup, form.milk)) e.milk = form.milk + " is out of stock";
     const outSyrup = form.syrups.find(s => !isInventoryAvailable(inventoryLookup, s));
     if (outSyrup) e.syrups = outSyrup + " is out of stock";
+    const outTopping = form.toppings.find(topping => !isInventoryAvailable(inventoryLookup, topping));
+    if (outTopping) e.toppings = outTopping + " is out of stock";
     return e;
   }
 
@@ -2615,21 +2640,23 @@ function CustomerPage() {
 
               {drink.category === "refresher" && <div className="field">
                 {lbl("Refresher toppings", `— pick up to ${MAX_REFRESHER_TOPPINGS}`)}
-                <div className="syrups">{REFRESHER_TOPPINGS.map(topping => {
-                  const selected = form.toppings.includes(topping);
+                <div className="syrups">{customerToppings.map(topping => {
+                  const selected = form.toppings.includes(topping.item);
                   const maxed = !selected && form.toppings.length >= MAX_REFRESHER_TOPPINGS;
                   return (
                     <button
-                      key={topping}
+                      key={topping.item}
                       disabled={maxed}
                       className={selected ? "syrup active" : "syrup"}
-                      onClick={() => toggleTopping(topping)}
+                      onClick={() => toggleTopping(topping.item)}
                     >
-                      {selected ? "✓ " : ""}{topping}
+                      {selected ? "✓ " : ""}{topping.item}
                     </button>
                   );
                 })}</div>
                 <div className="muted small">{form.toppings.length === 0 ? "No refresher toppings selected" : `${form.toppings.length}/${MAX_REFRESHER_TOPPINGS} selected`}</div>
+                {customerToppings.length === 0 && <div className="errorText">No refresher toppings available right now.</div>}
+                {errors.toppings && <div className="errorText">{errors.toppings}</div>}
               </div>}
 
               {!drink.syrups && !drink.milk && <div className="servedOnly">Served as listed: <strong>{drink.label}</strong></div>}
