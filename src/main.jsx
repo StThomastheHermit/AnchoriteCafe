@@ -1287,7 +1287,8 @@ function AdminPage() {
                 <span>Serves/unit</span>
                 <span>Cost/unit</span>
                 <span>Used</span>
-                <span>Waste</span>
+                <span>Actual left</span>
+                <span>Auto waste</span>
                 <span>Remaining</span>
                 <span>Value left</span>
               </div>
@@ -1316,10 +1317,12 @@ function AdminPage() {
                   />
                   <span>{formatCount(item.usedServings)}</span>
                   <input
-                    value={item.wasteServings ?? 0}
-                    onChange={e => updateFinanceItem(item.id, { wasteServings: e.target.value })}
+                    value={item.actualRemainingServings ?? ""}
+                    onChange={e => updateFinanceItem(item.id, { actualRemainingServings: e.target.value })}
                     inputMode="decimal"
+                    placeholder={formatCount(item.remainingServings)}
                   />
+                  <span>{formatCount(item.wasteServings)}</span>
                   <span className={Number(item.remainingServings || 0) <= 5 ? "financeLow" : ""}>{formatCount(item.remainingServings)}</span>
                   <span>{formatCurrency(item.remainingValue)}</span>
                 </div>

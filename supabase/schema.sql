@@ -122,6 +122,7 @@ create table if not exists finance_items (
   servings_per_unit numeric not null default 1,
   unit_cost numeric not null default 0,
   waste_servings numeric not null default 0,
+  actual_remaining_servings numeric,
   active boolean not null default true,
   sort_order integer not null default 0,
   updated_at timestamptz not null default now()
@@ -133,6 +134,7 @@ alter table finance_items add column if not exists units_on_hand numeric not nul
 alter table finance_items add column if not exists servings_per_unit numeric not null default 1;
 alter table finance_items add column if not exists unit_cost numeric not null default 0;
 alter table finance_items add column if not exists waste_servings numeric not null default 0;
+alter table finance_items add column if not exists actual_remaining_servings numeric;
 alter table finance_items add column if not exists active boolean not null default true;
 alter table finance_items add column if not exists sort_order integer not null default 0;
 alter table finance_items add column if not exists updated_at timestamptz not null default now();
@@ -1229,10 +1231,22 @@ as $$
     select
       fi.*,
       coalesce(ur.used, 0) as used_servings,
-      greatest(0, (fi.units_on_hand * fi.servings_per_unit) - coalesce(ur.used, 0) - coalesce(fi.waste_servings, 0)) as remaining_servings,
+      coalesce(
+        fi.actual_remaining_servings,
+        greatest(0, (fi.units_on_hand * fi.servings_per_unit) - coalesce(ur.used, 0) - coalesce(fi.waste_servings, 0))
+      ) as remaining_servings,
+      greatest(
+        0,
+        (fi.units_on_hand * fi.servings_per_unit)
+          - coalesce(ur.used, 0)
+          - coalesce(fi.actual_remaining_servings, greatest(0, (fi.units_on_hand * fi.servings_per_unit) - coalesce(ur.used, 0) - coalesce(fi.waste_servings, 0)))
+      ) as calculated_waste_servings,
       case
         when fi.servings_per_unit <= 0 then 0
-        else greatest(0, (fi.units_on_hand * fi.servings_per_unit) - coalesce(ur.used, 0) - coalesce(fi.waste_servings, 0)) / fi.servings_per_unit * fi.unit_cost
+        else coalesce(
+          fi.actual_remaining_servings,
+          greatest(0, (fi.units_on_hand * fi.servings_per_unit) - coalesce(ur.used, 0) - coalesce(fi.waste_servings, 0))
+        ) / fi.servings_per_unit * fi.unit_cost
       end as remaining_value
     from finance_items fi
     left join usage_rows ur on ur.id = fi.id
@@ -1243,7 +1257,7 @@ as $$
       category,
       sum(units_on_hand * servings_per_unit) as capacity,
       sum(used_servings) as used,
-      sum(waste_servings) as waste,
+      sum(calculated_waste_servings) as waste,
       sum(remaining_servings) as remaining,
       sum(remaining_value) as remaining_value
     from item_rows
@@ -1261,7 +1275,8 @@ as $$
         'servingsPerUnit', servings_per_unit,
         'unitCost', unit_cost,
         'usedServings', used_servings,
-        'wasteServings', waste_servings,
+        'wasteServings', calculated_waste_servings,
+        'actualRemainingServings', actual_remaining_servings,
         'remainingServings', remaining_servings,
         'remainingValue', remaining_value,
         'sortOrder', sort_order
@@ -1305,7 +1320,7 @@ begin
       units_on_hand = greatest(0, coalesce(nullif(supply_item->>'unitsOnHand', '')::numeric, 0)),
       servings_per_unit = greatest(0, coalesce(nullif(supply_item->>'servingsPerUnit', '')::numeric, 1)),
       unit_cost = greatest(0, coalesce(nullif(supply_item->>'unitCost', '')::numeric, 0)),
-      waste_servings = greatest(0, coalesce(nullif(supply_item->>'wasteServings', '')::numeric, 0)),
+      actual_remaining_servings = nullif(supply_item->>'actualRemainingServings', '')::numeric,
       updated_at = now()
     where id = supply_item->>'id';
   end loop;
