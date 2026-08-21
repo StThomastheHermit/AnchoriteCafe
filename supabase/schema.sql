@@ -183,16 +183,28 @@ insert into inventory (item, type, available) values
 ('Honey','syrup',true),
 ('Cinnamon Powder','syrup',true),
 ('Hazelnut','syrup',true),
-('Strawberry Popping Boba','topping',true),
-('Mango Popping Boba','topping',true),
-('Peach Popping Boba','topping',true),
-('Fresh Strawberry','topping',true),
-('Lemon Slice','topping',true),
+('Freeze-Dried Raspberry','topping',true),
+('Freeze-Dried Mango','topping',true),
+('Freeze-Dried Strawberries','topping',true),
+('Brown Sugar Popping Pearls','topping',true),
+('Mango Popping Pearls','topping',true),
+('Strawberry Popping Pearls','topping',true),
+('Green Apple Popping Pearls','topping',true),
 ('Almond milk','milk',true),
 ('Oat milk','milk',true),
 ('Soy milk','milk',true),
 ('Whole milk','milk',false)
 on conflict (item) do nothing;
+
+update inventory
+set active = false, available = false
+where type = 'topping'
+  and item in ('Strawberry Popping Boba', 'Mango Popping Boba', 'Peach Popping Boba', 'Fresh Strawberry', 'Lemon Slice');
+
+update inventory
+set active = true, available = true
+where type = 'topping'
+  and item in ('Freeze-Dried Raspberry', 'Freeze-Dried Mango', 'Freeze-Dried Strawberries', 'Brown Sugar Popping Pearls', 'Mango Popping Pearls', 'Strawberry Popping Pearls', 'Green Apple Popping Pearls');
 
 update inventory
 set sort_order = ranked.sort_order
@@ -214,11 +226,13 @@ from (
         when 'Honey' then 6
         when 'Cinnamon Powder' then 7
         when 'Hazelnut' then 8
-        when 'Strawberry Popping Boba' then 0
-        when 'Mango Popping Boba' then 1
-        when 'Peach Popping Boba' then 2
-        when 'Fresh Strawberry' then 3
-        when 'Lemon Slice' then 4
+        when 'Freeze-Dried Raspberry' then 0
+        when 'Freeze-Dried Mango' then 1
+        when 'Freeze-Dried Strawberries' then 2
+        when 'Brown Sugar Popping Pearls' then 3
+        when 'Mango Popping Pearls' then 4
+        when 'Strawberry Popping Pearls' then 5
+        when 'Green Apple Popping Pearls' then 6
         else 99
       end,
       item
@@ -228,25 +242,45 @@ from (
 where inventory.item = ranked.item
   and inventory.sort_order = 0;
 
+delete from menu_drinks
+where id in ('americano', 'latte', 'cappuccino', 'cortado', 'espresso', 'strawberry-refresher', 'mango-refresher', 'strawberry-banana-smoothie');
+
 insert into menu_drinks (id, label, description, category, temps, has_milk, has_syrups, show_temp, price, active, sort_order) values
-('americano','Americano','No milk, water only','coffee',array['Hot','Cold'],false,true,true,5,true,0),
-('latte','Latte','Standard milk and coffee drink','coffee',array['Hot','Cold'],true,true,true,5,true,1),
-('cappuccino','Cappuccino','More milk foam','coffee',array['Hot','Cold'],true,true,true,5,true,2),
-('cortado','Cortado','More coffee forward, less milk','coffee',array['Hot'],true,true,true,5,true,3),
-('espresso','Double Shot Espresso','Pure espresso; no milk, water, or syrup','coffee',array['Hot'],false,false,true,5,true,4),
-('strawberry-refresher','Strawberry Refresher','Iced fruit refresher','refresher',array['Cold'],false,false,false,5,true,5),
-('mango-refresher','Mango Refresher','Iced fruit refresher','refresher',array['Cold'],false,false,false,5,true,6),
-('strawberry-banana-smoothie','Strawberry Banana Smoothie','Blended smoothie','smoothie',array['Cold'],false,false,false,5,true,7),
-('mango-smoothie','Mango Smoothie','Blended smoothie','smoothie',array['Cold'],false,false,false,5,true,8),
-('water','Water','Bottled water','drink',array['Cold'],false,false,false,3,true,9),
-('soda','Soda','Canned soda','drink',array['Cold'],false,false,false,3,true,10),
-('juice','Juice','Choose box or bottle','drink',array['Cold'],false,false,false,2,true,11),
-('juice-bottle','Juice Bottle','Bottled juice','drink',array['Cold'],false,false,false,3,false,12),
-('juice-box','Juice Box','Boxed juice','drink',array['Cold'],false,false,false,2,false,13),
-('small-snack','Small Snack','Small snack item','snack',array['Cold'],false,false,false,1,true,14),
-('big-snack','Big Snack','Big snack item','snack',array['Cold'],false,false,false,2,true,15),
-('light-meal','Light Meal','Light meal item','snack',array['Cold'],false,false,false,3,true,16)
-on conflict (id) do nothing;
+('iced-caramel','Iced Caramel','Poster coffee menu','coffee',array['Cold'],true,true,false,5,true,0),
+('hot-caramel','Hot Caramel','Poster coffee menu','coffee',array['Hot'],true,true,false,5,true,1),
+('caramel-frappe','Caramel Frappe','Blended caramel coffee','coffee',array['Cold'],true,true,false,5,true,2),
+('iced-mocha','Iced Mocha','Poster coffee menu','coffee',array['Cold'],true,true,false,5,true,3),
+('hot-mocha','Hot Mocha','Poster coffee menu','coffee',array['Hot'],true,true,false,5,true,4),
+('mocha-frappe','Mocha Frappe','Blended mocha coffee','coffee',array['Cold'],true,true,false,5,true,5),
+('iced-vanilla','Iced Vanilla','Poster coffee menu','coffee',array['Cold'],true,true,false,5,true,6),
+('hot-vanilla','Hot Vanilla','Poster coffee menu','coffee',array['Hot'],true,true,false,5,true,7),
+('vanilla-frappe','Vanilla Frappe','Blended vanilla coffee','coffee',array['Cold'],true,true,false,5,true,8),
+('cranberry-mango','Cranberry Mango','Light, fruity refresher','refresher',array['Cold'],false,false,false,5,true,9),
+('cranberry-pineapple','Cranberry Pineapple','Light, fruity refresher','refresher',array['Cold'],false,false,false,5,true,10),
+('cranberry-raspberry','Cranberry Raspberry','Light, fruity refresher','refresher',array['Cold'],false,false,false,5,true,11),
+('strawberry-acai','Strawberry Acai','Light, fruity refresher','refresher',array['Cold'],false,false,false,5,true,12),
+('mango-smoothie','Mango Smoothie','Blended smoothie','smoothie',array['Cold'],false,false,false,5,true,13),
+('strawberry-smoothie','Strawberry Smoothie','Blended smoothie','smoothie',array['Cold'],false,false,false,5,true,14),
+('water','Water','Bottled water','drink',array['Cold'],false,false,false,3,true,15),
+('soda','Soda','Canned soda','drink',array['Cold'],false,false,false,3,true,16),
+('juice','Juice','Choose box or bottle','drink',array['Cold'],false,false,false,2,true,17),
+('juice-bottle','Juice Bottle','Bottled juice','drink',array['Cold'],false,false,false,3,false,18),
+('juice-box','Juice Box','Boxed juice','drink',array['Cold'],false,false,false,2,false,19),
+('small-snack','Small Snack','Small snack item','snack',array['Cold'],false,false,false,1,true,20),
+('big-snack','Big Snack','Big snack item','snack',array['Cold'],false,false,false,2,true,21),
+('light-meal','Light Meal','Light meal item','snack',array['Cold'],false,false,false,3,true,22)
+on conflict (id) do update set
+  label = excluded.label,
+  description = excluded.description,
+  category = excluded.category,
+  temps = excluded.temps,
+  has_milk = excluded.has_milk,
+  has_syrups = excluded.has_syrups,
+  show_temp = excluded.show_temp,
+  price = excluded.price,
+  active = excluded.active,
+  sort_order = excluded.sort_order,
+  updated_at = now();
 
 update menu_drinks
 set active = false

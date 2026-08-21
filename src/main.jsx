@@ -31,15 +31,21 @@ const MENU_PRICES = {
 };
 
 const DRINKS = [
-  { id: "americano", label: "Americano", desc: "No milk, water only", category: "coffee", temps: ["Hot", "Cold"], milk: false, syrups: true },
-  { id: "latte", label: "Latte", desc: "Standard milk and coffee drink", category: "coffee", temps: ["Hot", "Cold"], milk: true, syrups: true },
-  { id: "cappuccino", label: "Cappuccino", desc: "More milk foam", category: "coffee", temps: ["Hot", "Cold"], milk: true, syrups: true },
-  { id: "cortado", label: "Cortado", desc: "More coffee forward, less milk", category: "coffee", temps: ["Hot"], milk: true, syrups: true },
-  { id: "espresso", label: "Double Shot Espresso", desc: "Pure espresso; no milk, water, or syrup", category: "coffee", temps: ["Hot"], milk: false, syrups: false },
-  { id: "strawberry-refresher", label: "Strawberry Refresher", desc: "Iced fruit refresher", category: "refresher", temps: ["Cold"], milk: false, syrups: false, toppings: true, showTemp: false },
-  { id: "mango-refresher", label: "Mango Refresher", desc: "Iced fruit refresher", category: "refresher", temps: ["Cold"], milk: false, syrups: false, toppings: true, showTemp: false },
-  { id: "strawberry-banana-smoothie", label: "Strawberry Banana Smoothie", desc: "Blended smoothie", category: "smoothie", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
+  { id: "iced-caramel", label: "Iced Caramel", desc: "Poster coffee menu", category: "coffee", temps: ["Cold"], milk: true, syrups: true, showTemp: false },
+  { id: "hot-caramel", label: "Hot Caramel", desc: "Poster coffee menu", category: "coffee", temps: ["Hot"], milk: true, syrups: true, showTemp: false },
+  { id: "caramel-frappe", label: "Caramel Frappe", desc: "Blended caramel coffee", category: "coffee", temps: ["Cold"], milk: true, syrups: true, showTemp: false },
+  { id: "iced-mocha", label: "Iced Mocha", desc: "Poster coffee menu", category: "coffee", temps: ["Cold"], milk: true, syrups: true, showTemp: false },
+  { id: "hot-mocha", label: "Hot Mocha", desc: "Poster coffee menu", category: "coffee", temps: ["Hot"], milk: true, syrups: true, showTemp: false },
+  { id: "mocha-frappe", label: "Mocha Frappe", desc: "Blended mocha coffee", category: "coffee", temps: ["Cold"], milk: true, syrups: true, showTemp: false },
+  { id: "iced-vanilla", label: "Iced Vanilla", desc: "Poster coffee menu", category: "coffee", temps: ["Cold"], milk: true, syrups: true, showTemp: false },
+  { id: "hot-vanilla", label: "Hot Vanilla", desc: "Poster coffee menu", category: "coffee", temps: ["Hot"], milk: true, syrups: true, showTemp: false },
+  { id: "vanilla-frappe", label: "Vanilla Frappe", desc: "Blended vanilla coffee", category: "coffee", temps: ["Cold"], milk: true, syrups: true, showTemp: false },
+  { id: "cranberry-mango", label: "Cranberry Mango", desc: "Light, fruity refresher", category: "refresher", temps: ["Cold"], milk: false, syrups: false, toppings: true, showTemp: false },
+  { id: "cranberry-pineapple", label: "Cranberry Pineapple", desc: "Light, fruity refresher", category: "refresher", temps: ["Cold"], milk: false, syrups: false, toppings: true, showTemp: false },
+  { id: "cranberry-raspberry", label: "Cranberry Raspberry", desc: "Light, fruity refresher", category: "refresher", temps: ["Cold"], milk: false, syrups: false, toppings: true, showTemp: false },
+  { id: "strawberry-acai", label: "Strawberry Acai", desc: "Light, fruity refresher", category: "refresher", temps: ["Cold"], milk: false, syrups: false, toppings: true, showTemp: false },
   { id: "mango-smoothie", label: "Mango Smoothie", desc: "Blended smoothie", category: "smoothie", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
+  { id: "strawberry-smoothie", label: "Strawberry Smoothie", desc: "Blended smoothie", category: "smoothie", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
   { id: "water", label: "Water", desc: "Bottled water", category: "drink", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
   { id: "soda", label: "Soda", desc: "Canned soda", category: "drink", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
   { id: "juice", label: "Juice", desc: "Choose box or bottle", category: "drink", temps: ["Cold"], milk: false, syrups: false, showTemp: false, price: 2 },
@@ -50,7 +56,7 @@ const DRINKS = [
 
 const MILKS = ["Whole milk", "Almond milk", "Oat milk", "Soy milk"];
 const SYRUPS = ["Caramel", "Sugar Free Caramel", "Vanilla", "Sugar Free Vanilla", "Mocha", "White Chocolate", "Honey", "Cinnamon Powder", "Hazelnut"];
-const REFRESHER_TOPPINGS = ["Strawberry Popping Boba", "Mango Popping Boba", "Peach Popping Boba", "Fresh Strawberry", "Lemon Slice"];
+const REFRESHER_TOPPINGS = ["Freeze-Dried Raspberry", "Freeze-Dried Mango", "Freeze-Dried Strawberries", "Brown Sugar Popping Pearls", "Mango Popping Pearls", "Strawberry Popping Pearls", "Green Apple Popping Pearls"];
 const JUICE_OPTIONS = [
   { id: "box", label: "Juice Box", price: 2 },
   { id: "bottle", label: "Juice Bottle", price: 3 },
