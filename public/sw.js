@@ -9,8 +9,8 @@ self.addEventListener("push", event => {
   const title = payload.title || "Anchorite Cafe";
   const options = {
     body: payload.body || "Your order is ready. Please go to the kitchen.",
-    icon: "/icons/arise-icon-192.png",
-    badge: "/icons/arise-icon-192.png",
+    icon: "/icons/anchorite-icon-192.png",
+    badge: "/icons/anchorite-icon-192.png",
     data: {
       url: payload.url || "/",
       orderId: payload.orderId || "",

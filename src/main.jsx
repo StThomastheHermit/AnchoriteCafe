@@ -335,7 +335,7 @@ function Header({ isOpen, statusText }) {
   return (
     <header>
       <a className="brand" href="/">
-        <span>☕</span>
+        <span><img src="/icons/anchorite-icon-192.png" alt="" /></span>
         <div><h1>Anchorite Cafe</h1><p>Faith fueled soul rooted</p></div>
       </a>
       {!isAdminPage && <a className="adminLink" href="/admin">Admin Access</a>}
@@ -1623,7 +1623,7 @@ function DonationModal({ onClose }) {
   return (
     <div className="modalOverlay donationOverlay">
       <div className="donationModal">
-        <div className="donationIcon">☕</div>
+        <div className="donationIcon logoIcon"><img src="/icons/anchorite-icon-192.png" alt="" /></div>
         <h2>Payment</h2>
         <p>
           Payment is not verified automatically. Please send Zelle, then show staff your confirmation if asked.
@@ -1672,7 +1672,7 @@ function IosInstallGate({ onRefresh }) {
   return (
     <main className="iosInstallPage">
       <section className="iosInstallCard">
-        <div className="brandMark">☕</div>
+        <div className="brandMark logoIcon"><img src="/icons/anchorite-icon-192.png" alt="" /></div>
         <h1>Install Anchorite Cafe</h1>
         <p>On iPhone or iPad, please add Anchorite Cafe to your Home Screen before ordering so ready notifications can work.</p>
         <ol>
