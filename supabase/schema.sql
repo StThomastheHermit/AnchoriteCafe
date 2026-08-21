@@ -713,10 +713,22 @@ as $$
 declare
   new_id text;
   order_state jsonb;
+  note_parts text[];
 begin
   if arise_setting('isOpen', 'true') <> 'true' then
     return jsonb_build_object('ok', false, 'error', 'Queue closed');
   end if;
+
+  note_parts := array_remove(array[
+    nullif(coalesce(input_order->>'notes', ''), ''),
+    case
+      when jsonb_array_length(coalesce(input_order->'toppings', '[]'::jsonb)) > 0
+      then 'Refresher toppings: ' || array_to_string(array(select jsonb_array_elements_text(coalesce(input_order->'toppings', '[]'::jsonb))), ', ')
+      else null
+    end,
+    case when coalesce((input_order->>'lightIce')::boolean, false) then 'Light ice' else null end,
+    case when coalesce(nullif(input_order->>'price', '')::numeric, 0) > 0 then 'Item price: $' || trim(to_char(coalesce(nullif(input_order->>'price', '')::numeric, 0), 'FM999999990.00')) else null end
+  ], null);
 
   insert into orders (name, customer_name, drink, temp, temperature, milk, syrups, notes, status)
   values (
@@ -727,7 +739,7 @@ begin
     coalesce(input_order->>'temp', ''),
     coalesce(input_order->>'milk', ''),
     coalesce(array(select jsonb_array_elements_text(coalesce(input_order->'syrups', '[]'::jsonb))), '{}'::text[]),
-    coalesce(input_order->>'notes', ''),
+    array_to_string(note_parts, ' | '),
     'waiting'
   )
   returning id::text into new_id;

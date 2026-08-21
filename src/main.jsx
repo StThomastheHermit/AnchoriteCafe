@@ -2398,6 +2398,9 @@ function CustomerPage() {
           temp: item.temp,
           milk: item.milk,
           syrups: item.syrups,
+          toppings: item.toppings,
+          lightIce: item.lightIce,
+          price: item.price,
           notes: noteParts.join(" | "),
         });
 
