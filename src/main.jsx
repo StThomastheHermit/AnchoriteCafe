@@ -331,13 +331,16 @@ function ringReadyAlert() {
 }
 
 function Header({ isOpen, statusText }) {
-  const isAdminPage = window.location.pathname.toLowerCase().startsWith("/admin");
+  const path = window.location.pathname.toLowerCase();
+  const isAdminPage = path.startsWith("/admin");
+  const isClockPage = path.startsWith("/clock") || path.startsWith("/timeclock");
   return (
     <header>
       <a className="brand" href="/">
         <span><img src="/icons/anchorite-icon-192.png" alt="" /></span>
         <div><h1>Anchorite Cafe</h1><p>Faith fueled soul rooted</p></div>
       </a>
+      {!isClockPage && <a className="adminLink staffClockLink" href="/clock">Staff Clock</a>}
       {!isAdminPage && <a className="adminLink" href="/admin">Admin Access</a>}
       <div className={isOpen ? "pill open" : "pill closed"}>{statusText || (isOpen ? "● Open" : "● Closed")}</div>
     </header>
