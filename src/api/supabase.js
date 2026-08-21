@@ -43,6 +43,8 @@ export async function apiPost(payload) {
   if (payload.action === "archive") return getArchive(payload.pin);
   if (payload.action === "clearArchive") return clearArchive(payload.pin);
   if (payload.action === "analytics") return getAnalytics(payload.pin, payload.weekOffset);
+  if (payload.action === "finance") return getFinance(payload.pin);
+  if (payload.action === "saveFinance") return saveFinance(payload.pin, payload.items);
   if (payload.action === "timeClock") return timeClock(payload.employeePin);
   if (payload.action === "timeClockAdmin") return getTimeClockAdmin(payload.pin);
   if (payload.action === "saveEmployee") return saveEmployee(payload.pin, payload.employee);
@@ -268,6 +270,25 @@ export async function getAnalytics(pin, weekOffset = 0) {
     });
   } catch {
     return { ok: false, error: "Connection error" };
+  }
+}
+
+export async function getFinance(pin) {
+  try {
+    return await callRpc("arise_finance", { input_pin: String(pin || "") });
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) };
+  }
+}
+
+export async function saveFinance(pin, items) {
+  try {
+    return await callRpc("arise_save_finance", {
+      input_pin: String(pin || ""),
+      input_items: Array.isArray(items) ? items : [],
+    });
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) };
   }
 }
 

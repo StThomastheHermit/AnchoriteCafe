@@ -96,6 +96,11 @@ function formatPrice(amount) {
   return `$${Number(amount || 0).toFixed(2).replace(/\.00$/, "")}`;
 }
 
+function formatCount(amount) {
+  const value = Number(amount || 0);
+  return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, "");
+}
+
 function normalizeMenuDrinks(drinks, includeInactive = false) {
   const source = Array.isArray(drinks) && drinks.length ? drinks : DRINKS;
   return source
@@ -449,6 +454,9 @@ function AdminPage() {
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [analyticsLoaded, setAnalyticsLoaded] = useState(false);
   const [analyticsWeekOffset, setAnalyticsWeekOffset] = useState(0);
+  const [finance, setFinance] = useState({ items: [], totals: [] });
+  const [financeLoaded, setFinanceLoaded] = useState(false);
+  const [financeBusy, setFinanceBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [timeClock, setTimeClock] = useState({ employees: [], entries: [], totals: [] });
   const [timeClockLoaded, setTimeClockLoaded] = useState(false);
@@ -735,6 +743,59 @@ function AdminPage() {
     setAnalyticsOpen(true);
     setAdminView("analytics");
     if (!analyticsLoaded) await loadAnalytics();
+  }
+
+  async function loadFinance() {
+    setFinanceBusy(true);
+    try {
+      const data = await apiPost({ action: "finance", pin });
+      if (data.ok) {
+        setFinance({
+          items: Array.isArray(data.items) ? data.items : [],
+          totals: Array.isArray(data.totals) ? data.totals : [],
+        });
+        setFinanceLoaded(true);
+      } else {
+        alert(data.error || "Could not load finance");
+      }
+    } catch {
+      alert("Connection error");
+    } finally {
+      setFinanceBusy(false);
+    }
+  }
+
+  async function openFinanceScreen() {
+    if (!isOwner) return;
+    setAdminView("finance");
+    if (!financeLoaded) await loadFinance();
+  }
+
+  function updateFinanceItem(id, patch) {
+    setFinance(current => ({
+      ...current,
+      items: current.items.map(item => item.id === id ? { ...item, ...patch } : item),
+    }));
+  }
+
+  async function saveFinance() {
+    setFinanceBusy(true);
+    try {
+      const data = await apiPost({ action: "saveFinance", pin, items: finance.items });
+      if (data.ok) {
+        setFinance({
+          items: Array.isArray(data.items) ? data.items : finance.items,
+          totals: Array.isArray(data.totals) ? data.totals : finance.totals,
+        });
+        setFinanceLoaded(true);
+      } else {
+        alert(data.error || "Could not save finance");
+      }
+    } catch {
+      alert("Connection error");
+    } finally {
+      setFinanceBusy(false);
+    }
   }
 
   async function loadTimeClock() {
@@ -1169,6 +1230,72 @@ function AdminPage() {
     );
   }
 
+  if (adminView === "finance") {
+    return (
+      <>
+        <Header isOpen={isOpen} />
+        <main className="adminPage">
+          <section className="adminTop">
+            <div>
+              <h2>Finance</h2>
+              <p className="sub">Track supply counts and estimate servings from completed orders.</p>
+            </div>
+            <div className="adminTopActions">
+              <button className="ghostBtn" disabled={financeBusy} onClick={loadFinance}>Refresh</button>
+              <button className="primaryBtn compactPrimary" disabled={financeBusy} onClick={saveFinance}>{financeBusy ? "Saving..." : "Save"}</button>
+              <button className="ghostBtn" onClick={() => setAdminView("dashboard")}>Back to dashboard</button>
+            </div>
+          </section>
+
+          <section className="analyticsPanel financePanel">
+            <div className="analyticsSummary">
+              {(finance.totals || []).map(total => (
+                <div key={total.category}>
+                  <span>{total.category}</span>
+                  <strong>{formatCount(total.used)} used</strong>
+                  <em>{formatCount(total.capacity)} capacity</em>
+                </div>
+              ))}
+            </div>
+
+            <div className="financeTable">
+              <div className="financeRow financeHead">
+                <span>Item</span>
+                <span>Type</span>
+                <span>On hand</span>
+                <span>Serves/unit</span>
+                <span>Used</span>
+                <span>Remaining</span>
+              </div>
+              {financeBusy && !finance.items.length ? (
+                <div className="empty smallEmpty">Loading finance...</div>
+              ) : finance.items.length === 0 ? (
+                <div className="empty smallEmpty">No finance items yet.</div>
+              ) : finance.items.map(item => (
+                <div className="financeRow" key={item.id}>
+                  <strong>{item.item}</strong>
+                  <span>{item.category}</span>
+                  <input
+                    value={item.unitsOnHand ?? 0}
+                    onChange={e => updateFinanceItem(item.id, { unitsOnHand: e.target.value })}
+                    inputMode="decimal"
+                  />
+                  <input
+                    value={item.servingsPerUnit ?? 0}
+                    onChange={e => updateFinanceItem(item.id, { servingsPerUnit: e.target.value })}
+                    inputMode="decimal"
+                  />
+                  <span>{formatCount(item.usedServings)}</span>
+                  <span className={Number(item.remainingServings || 0) <= 5 ? "financeLow" : ""}>{formatCount(item.remainingServings)}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        </main>
+      </>
+    );
+  }
+
   if (adminView === "timeclock") {
     const totalsByEmployee = Object.fromEntries((timeClock.totals || []).map(total => [total.employeeId, total]));
     return (
@@ -1313,6 +1440,10 @@ function AdminPage() {
           {isOwner && <button className={analyticsOpen ? "toolTile active" : "toolTile"} onClick={toggleAnalytics}>
             <strong>Analytics</strong>
             <span>Popular items</span>
+          </button>}
+          {isOwner && <button className={adminView === "finance" ? "toolTile active" : "toolTile"} onClick={openFinanceScreen}>
+            <strong>Finance</strong>
+            <span>Supply counts</span>
           </button>}
           {isOwner && <button className={adminView === "timeclock" ? "toolTile active" : "toolTile"} onClick={openTimeClockScreen}>
             <strong>Time Clock</strong>

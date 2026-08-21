@@ -112,6 +112,25 @@ alter table time_entries add column if not exists clock_in timestamptz not null 
 alter table time_entries add column if not exists clock_out timestamptz;
 alter table time_entries add column if not exists created_at timestamptz not null default now();
 
+create table if not exists finance_items (
+  id text primary key,
+  item text not null,
+  category text not null default 'Supply',
+  units_on_hand numeric not null default 0,
+  servings_per_unit numeric not null default 1,
+  active boolean not null default true,
+  sort_order integer not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+alter table finance_items add column if not exists item text;
+alter table finance_items add column if not exists category text not null default 'Supply';
+alter table finance_items add column if not exists units_on_hand numeric not null default 0;
+alter table finance_items add column if not exists servings_per_unit numeric not null default 1;
+alter table finance_items add column if not exists active boolean not null default true;
+alter table finance_items add column if not exists sort_order integer not null default 0;
+alter table finance_items add column if not exists updated_at timestamptz not null default now();
+
 alter table archived_orders add column if not exists original_order_id_text text;
 alter table archived_orders add column if not exists original_created_at timestamptz;
 alter table archived_orders add column if not exists customer_name text;
@@ -121,6 +140,19 @@ alter table archived_orders add column if not exists milk text;
 alter table archived_orders add column if not exists syrups text;
 alter table archived_orders add column if not exists notes text;
 alter table archived_orders add column if not exists status text;
+
+insert into finance_items (id, item, category, units_on_hand, servings_per_unit, active, sort_order) values
+('espresso-beans','Espresso beans','Coffee',0,60,true,0),
+('whole-milk','Whole milk','Milk',0,16,true,1),
+('almond-milk','Almond milk','Milk',0,16,true,2),
+('oat-milk','Oat milk','Milk',0,16,true,3),
+('soy-milk','Soy milk','Milk',0,16,true,4),
+('juice-concentrate','Juice concentrate','Juice',0,60,true,5),
+('soda-cans','Soda cans','Soda',0,1,true,6),
+('water-bottles','Water bottles','Water',0,1,true,7),
+('refresher-base','Refresher base','Refreshers',0,60,true,8),
+('smoothie-mix','Smoothie mix','Smoothies',0,30,true,9)
+on conflict (id) do nothing;
 
 insert into inventory (item, type, available) values
 ('Caramel','syrup',true),
@@ -198,6 +230,7 @@ alter table settings enable row level security;
 alter table archived_orders enable row level security;
 alter table employees enable row level security;
 alter table time_entries enable row level security;
+alter table finance_items enable row level security;
 
 revoke all on orders from anon;
 revoke all on inventory from anon;
@@ -206,6 +239,7 @@ revoke all on settings from anon;
 revoke all on archived_orders from anon;
 revoke all on employees from anon;
 revoke all on time_entries from anon;
+revoke all on finance_items from anon;
 grant delete on archived_orders to anon;
 
 drop function if exists arise_order(uuid);
@@ -1104,6 +1138,117 @@ as $$
   end;
 $$;
 
+drop function if exists arise_finance(text);
+create or replace function arise_finance(input_pin text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  with usage_rows as (
+    select 'espresso-beans' as id, count(*)::numeric as used
+    from archived_orders
+    where lower(coalesce(drink, '')) not like '%soda%'
+      and lower(coalesce(drink, '')) not like '%water%'
+      and lower(coalesce(drink, '')) not like '%juice%'
+      and lower(coalesce(drink, '')) not like '%refresher%'
+      and lower(coalesce(drink, '')) not like '%smoothie%'
+    union all
+    select 'whole-milk', count(*)::numeric from archived_orders where lower(coalesce(milk, '')) = 'whole milk'
+    union all
+    select 'almond-milk', count(*)::numeric from archived_orders where lower(coalesce(milk, '')) = 'almond milk'
+    union all
+    select 'oat-milk', count(*)::numeric from archived_orders where lower(coalesce(milk, '')) = 'oat milk'
+    union all
+    select 'soy-milk', count(*)::numeric from archived_orders where lower(coalesce(milk, '')) = 'soy milk'
+    union all
+    select 'juice-concentrate', count(*)::numeric from archived_orders where lower(coalesce(drink, '')) like '%juice%'
+    union all
+    select 'soda-cans', count(*)::numeric from archived_orders where lower(coalesce(drink, '')) like '%soda%'
+    union all
+    select 'water-bottles', count(*)::numeric from archived_orders where lower(coalesce(drink, '')) like '%water%'
+    union all
+    select 'refresher-base', count(*)::numeric from archived_orders where lower(coalesce(drink, '')) like '%refresher%'
+    union all
+    select 'smoothie-mix', count(*)::numeric from archived_orders where lower(coalesce(drink, '')) like '%smoothie%'
+  ),
+  item_rows as (
+    select
+      fi.*,
+      coalesce(ur.used, 0) as used_servings,
+      greatest(0, (fi.units_on_hand * fi.servings_per_unit) - coalesce(ur.used, 0)) as remaining_servings
+    from finance_items fi
+    left join usage_rows ur on ur.id = fi.id
+    where fi.active
+  ),
+  totals as (
+    select
+      category,
+      sum(units_on_hand * servings_per_unit) as capacity,
+      sum(used_servings) as used,
+      sum(remaining_servings) as remaining
+    from item_rows
+    group by category
+  )
+  select case
+    when not arise_pin_matches(input_pin) then jsonb_build_object('ok', false, 'error', 'Wrong PIN')
+    else jsonb_build_object(
+      'ok', true,
+      'items', coalesce((select jsonb_agg(jsonb_build_object(
+        'id', id,
+        'item', item,
+        'category', category,
+        'unitsOnHand', units_on_hand,
+        'servingsPerUnit', servings_per_unit,
+        'usedServings', used_servings,
+        'remainingServings', remaining_servings,
+        'sortOrder', sort_order
+      ) order by sort_order, item) from item_rows), '[]'::jsonb),
+      'totals', coalesce((select jsonb_agg(jsonb_build_object(
+        'category', category,
+        'capacity', capacity,
+        'used', used,
+        'remaining', remaining
+      ) order by category) from totals), '[]'::jsonb)
+    )
+  end;
+$$;
+
+drop function if exists arise_save_finance(text, jsonb);
+create or replace function arise_save_finance(input_pin text, input_items jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  supply_item jsonb;
+begin
+  if not arise_pin_matches(input_pin) then
+    return jsonb_build_object('ok', false, 'error', 'Wrong PIN');
+  end if;
+
+  if jsonb_typeof(coalesce(input_items, '[]'::jsonb)) <> 'array' then
+    return jsonb_build_object('ok', false, 'error', 'Invalid finance items');
+  end if;
+
+  for supply_item in
+    select value
+    from jsonb_array_elements(input_items)
+  loop
+    update finance_items
+    set
+      units_on_hand = greatest(0, coalesce(nullif(supply_item->>'unitsOnHand', '')::numeric, 0)),
+      servings_per_unit = greatest(0, coalesce(nullif(supply_item->>'servingsPerUnit', '')::numeric, 1)),
+      updated_at = now()
+    where id = supply_item->>'id';
+  end loop;
+
+  return arise_finance(input_pin);
+end;
+$$;
+
 grant execute on function arise_status() to anon;
 grant execute on function arise_inventory() to anon;
 grant execute on function arise_menu(text) to anon;
@@ -1121,6 +1266,8 @@ grant execute on function arise_clear_all(text) to anon;
 grant execute on function arise_archive(text, integer) to anon;
 grant execute on function arise_clear_archive(text) to anon;
 grant execute on function arise_analytics(text, integer) to anon;
+grant execute on function arise_finance(text) to anon;
+grant execute on function arise_save_finance(text, jsonb) to anon;
 
 create table if not exists push_subscriptions (
   id uuid primary key default gen_random_uuid(),

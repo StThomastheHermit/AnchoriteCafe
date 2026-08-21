@@ -247,11 +247,18 @@ input:focus,textarea:focus{outline:2px solid #C8823A}
 .analyticsSummary div,.analyticsList{background:#2C1400;border:1px solid rgba(200,130,58,.14);border-radius:8px;padding:12px}
 .analyticsSummary span{display:block;color:#8A9B8E;font-size:11px;margin-bottom:4px}
 .analyticsSummary strong{font-family:"Playfair Display",Georgia,serif;color:#C8823A;font-size:24px}
+.analyticsSummary em{display:block;color:var(--muted);font-size:11px;font-style:normal;margin-top:2px}
 .analyticsGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .analyticsList h3{font-size:14px;margin-bottom:10px;color:#FFF8F0}
 .analyticsRow{display:flex;justify-content:space-between;gap:10px;border-top:1px solid rgba(200,130,58,.10);padding:8px 0;color:#8A9B8E;font-size:12px}
 .analyticsRow:first-of-type{border-top:none}
 .analyticsRow strong{color:#C8823A}
+.financeTable{display:grid;gap:8px}
+.financeRow{display:grid;grid-template-columns:1.4fr .9fr .8fr .8fr .7fr .8fr;gap:8px;align-items:center;background:#2C1400;border:1px solid rgba(200,130,58,.14);border-radius:8px;padding:10px;color:var(--muted);font-size:12px}
+.financeRow strong{color:var(--text)}
+.financeRow input{width:100%;min-width:0;background:#1C0A00;border:1px solid rgba(200,130,58,.25);border-radius:6px;color:var(--text);padding:8px}
+.financeHead{background:transparent;border:none;color:var(--gold);font-weight:800;padding-block:0}
+.financeLow{color:#E05252;font-weight:800}
 .menuPanel{background:#241000;border:1px solid rgba(200,130,58,.14);border-radius:8px;padding:18px;margin-bottom:24px}
 .compactPrimary{width:auto;margin-top:0;padding:10px 14px}
 .menuEditorList{display:grid;grid-template-columns:1fr;gap:14px}
@@ -307,6 +314,8 @@ input:focus,textarea:focus{outline:2px solid #C8823A}
   .archiveOrder span{text-align:left;white-space:normal}
   .analyticsSummary,.analyticsGrid{grid-template-columns:1fr}
   .analyticsWeekBar{align-items:stretch;flex-direction:column}
+  .financeRow{grid-template-columns:1fr 1fr}
+  .financeHead{display:none}
   .menuFields,.menuOptionGrid{grid-template-columns:1fr}
   .menuCardBody,.menuCardControls{grid-template-columns:1fr}
   .menuEditorTop{flex-direction:column}
