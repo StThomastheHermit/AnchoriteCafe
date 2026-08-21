@@ -42,8 +42,7 @@ const DRINKS = [
   { id: "mango-smoothie", label: "Mango Smoothie", desc: "Blended smoothie", category: "smoothie", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
   { id: "water", label: "Water", desc: "Bottled water", category: "drink", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
   { id: "soda", label: "Soda", desc: "Canned soda", category: "drink", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
-  { id: "juice-bottle", label: "Juice Bottle", desc: "Bottled juice", category: "drink", temps: ["Cold"], milk: false, syrups: false, showTemp: false, price: 3 },
-  { id: "juice-box", label: "Juice Box", desc: "Boxed juice", category: "drink", temps: ["Cold"], milk: false, syrups: false, showTemp: false, price: 2 },
+  { id: "juice", label: "Juice", desc: "Choose box or bottle", category: "drink", temps: ["Cold"], milk: false, syrups: false, showTemp: false, price: 2 },
   { id: "small-snack", label: "Small Snack", desc: "Small snack item", category: "snack", temps: ["Cold"], milk: false, syrups: false, showTemp: false, price: 1 },
   { id: "big-snack", label: "Big Snack", desc: "Big snack item", category: "snack", temps: ["Cold"], milk: false, syrups: false, showTemp: false, price: 2 },
   { id: "light-meal", label: "Light Meal", desc: "Light meal item", category: "snack", temps: ["Cold"], milk: false, syrups: false, showTemp: false, price: 3 },
@@ -52,6 +51,10 @@ const DRINKS = [
 const MILKS = ["Whole milk", "Almond milk", "Oat milk", "Soy milk"];
 const SYRUPS = ["Caramel", "Sugar Free Caramel", "Vanilla", "Sugar Free Vanilla", "Mocha", "White Chocolate", "Honey", "Cinnamon Powder", "Hazelnut"];
 const REFRESHER_TOPPINGS = ["Strawberry Popping Boba", "Mango Popping Boba", "Peach Popping Boba", "Fresh Strawberry", "Lemon Slice"];
+const JUICE_OPTIONS = [
+  { id: "box", label: "Juice Box", price: 2 },
+  { id: "bottle", label: "Juice Bottle", price: 3 },
+];
 const MAX_SYRUPS = 2;
 const MAX_REFRESHER_TOPPINGS = 3;
 
@@ -106,6 +109,22 @@ function priceForDrink(drink) {
 
 function categoryCanHaveIce(category) {
   return ["coffee", "refresher", "smoothie", "drink"].includes(category);
+}
+
+function isJuiceDrink(drink) {
+  return drink?.id === "juice" || String(drink?.label || "").toLowerCase() === "juice";
+}
+
+function drinkCanHaveIce(drink) {
+  return categoryCanHaveIce(drink?.category) && !isJuiceDrink(drink);
+}
+
+function selectedJuiceOption(id) {
+  return JUICE_OPTIONS.find(option => option.id === id) || null;
+}
+
+function displayPriceForDrink(drink) {
+  return isJuiceDrink(drink) ? "$2-$3" : formatPrice(priceForDrink(drink));
 }
 
 function formatPrice(amount) {
@@ -174,7 +193,7 @@ function getDrink(id, drinks = DRINKS) {
 }
 
 function defaultForm() {
-  return { name: "", drinkId: "latte", temp: "Hot", milk: "", syrups: [], toppings: [], lightIce: false, notes: "" };
+  return { name: "", drinkId: "latte", temp: "Hot", milk: "", syrups: [], toppings: [], juiceOption: "", lightIce: false, notes: "" };
 }
 
 function defaultInventory() {
@@ -2103,7 +2122,8 @@ function CustomerPage() {
       milk: pending?.milk || "",
       syrups: pending?.syrups || [],
       toppings: pending?.toppings || [],
-      lightIce: categoryCanHaveIce(d.category) && nextTemp === "Cold" && Boolean(pending?.lightIce),
+      juiceOption: isJuiceDrink(d) ? (pending?.juiceOption || "") : "",
+      lightIce: drinkCanHaveIce(d) && nextTemp === "Cold" && Boolean(pending?.lightIce),
       notes: pending?.notes ?? f.notes,
     }));
     setErrors({});
@@ -2151,18 +2171,20 @@ function CustomerPage() {
   function buildCartItem() {
     const toppings = drink.category === "refresher" ? (form.toppings || []) : [];
     const temp = drink.showTemp === false ? drink.temps[0] : form.temp;
+    const juiceOption = isJuiceDrink(drink) ? selectedJuiceOption(form.juiceOption) : null;
     return {
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       name: form.name.trim(),
-      drink: drink.label,
+      drink: juiceOption ? juiceOption.label : drink.label,
       drinkId: form.drinkId,
       category: drink.category,
       temp,
       milk: drink.milk ? form.milk : "",
       syrups: drink.syrups ? form.syrups : [],
       toppings,
-      lightIce: categoryCanHaveIce(drink.category) && temp === "Cold" && form.lightIce,
-      price: priceForDrink(drink),
+      juiceOption: juiceOption?.id || "",
+      lightIce: drinkCanHaveIce(drink) && temp === "Cold" && form.lightIce,
+      price: juiceOption ? juiceOption.price : priceForDrink(drink),
       notes: form.notes.trim(),
     };
   }
@@ -2172,6 +2194,7 @@ function CustomerPage() {
     if (!customerDrinks.some(d => d.id === form.drinkId)) e.drink = "That drink is not available today";
     if (!form.name.trim()) e.name = "Please enter your name";
     else if (!hasFirstAndLastName(form.name)) e.name = "Please enter first and last name";
+    if (isJuiceDrink(drink) && !selectedJuiceOption(form.juiceOption)) e.juice = "Please choose juice box or juice bottle";
     if (drink.milk && !form.milk) e.milk = "Please choose a milk";
     if (form.milk && !isInventoryAvailable(inventoryLookup, form.milk)) e.milk = form.milk + " is out of stock";
     const outSyrup = form.syrups.find(s => !isInventoryAvailable(inventoryLookup, s));
@@ -2247,7 +2270,7 @@ function CustomerPage() {
       ? lastOrder.syrups.filter(s => isInventoryAvailable(inventoryLookup, s)).slice(0, MAX_SYRUPS)
       : [];
 
-    pendingLastOrderRef.current = { temp: nextTemp, milk: nextMilk, syrups: nextSyrups, lightIce: categoryCanHaveIce(savedDrink.category) && nextTemp === "Cold" && Boolean(lastOrder.lightIce), notes: lastOrder.notes || "" };
+    pendingLastOrderRef.current = { temp: nextTemp, milk: nextMilk, syrups: nextSyrups, juiceOption: isJuiceDrink(savedDrink) ? lastOrder.juiceOption : "", lightIce: drinkCanHaveIce(savedDrink) && nextTemp === "Cold" && Boolean(lastOrder.lightIce), notes: lastOrder.notes || "" };
     setForm(f => ({ ...f, drinkId: savedDrink.id }));
     setErrors({});
   }
@@ -2317,6 +2340,7 @@ function CustomerPage() {
         temp: first.temp,
         milk: first.milk,
         syrups: first.syrups,
+        juiceOption: first.juiceOption,
         lightIce: first.lightIce,
         notes: first.notes,
         expiresAt: Date.now() + LAST_ORDER_TTL_MS,
@@ -2443,7 +2467,7 @@ function CustomerPage() {
                       <div className="drinkList">
                         {category.drinks.map(d => (
                           <button key={d.id} className={form.drinkId === d.id ? "drink active" : "drink"} onClick={() => setForm(f => ({...f, drinkId: d.id}))}>
-                            <strong>{d.label} <em>{formatPrice(priceForDrink(d))}</em></strong>
+                            <strong>{d.label} <em>{displayPriceForDrink(d)}</em></strong>
                             <span>{d.desc}</span>
                           </button>
                         ))}
@@ -2461,7 +2485,28 @@ function CustomerPage() {
                 </div>
               ) : <div className="servedOnly">Served <strong>{drink.temps[0].toLowerCase()}</strong> only</div>)}
 
-              {categoryCanHaveIce(drink.category) && (drink.showTemp === false ? drink.temps[0] : form.temp) === "Cold" && (
+              {isJuiceDrink(drink) && (
+                <div className="field">
+                  {lbl("Juice size", "(required)")}
+                  <div className="row wrap">
+                    {JUICE_OPTIONS.map(option => (
+                      <button
+                        key={option.id}
+                        className={form.juiceOption === option.id ? "choice active" : "choice"}
+                        onClick={() => {
+                          setForm(f => ({ ...f, juiceOption: option.id, lightIce: false }));
+                          setErrors(er => ({ ...er, juice: "" }));
+                        }}
+                      >
+                        {option.label} · {formatPrice(option.price)}
+                      </button>
+                    ))}
+                  </div>
+                  {errors.juice && <div className="errorText">{errors.juice}</div>}
+                </div>
+              )}
+
+              {drinkCanHaveIce(drink) && (drink.showTemp === false ? drink.temps[0] : form.temp) === "Cold" && (
                 <div className="field">
                   {lbl("Ice")}
                   <div className="row">

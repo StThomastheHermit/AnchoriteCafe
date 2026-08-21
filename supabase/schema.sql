@@ -227,15 +227,20 @@ insert into menu_drinks (id, label, description, category, temps, has_milk, has_
 ('mango-smoothie','Mango Smoothie','Blended smoothie','smoothie',array['Cold'],false,false,false,5,true,8),
 ('water','Water','Bottled water','drink',array['Cold'],false,false,false,3,true,9),
 ('soda','Soda','Canned soda','drink',array['Cold'],false,false,false,3,true,10),
-('juice-bottle','Juice Bottle','Bottled juice','drink',array['Cold'],false,false,false,3,true,11),
-('juice-box','Juice Box','Boxed juice','drink',array['Cold'],false,false,false,2,true,12),
-('small-snack','Small Snack','Small snack item','snack',array['Cold'],false,false,false,1,true,13),
-('big-snack','Big Snack','Big snack item','snack',array['Cold'],false,false,false,2,true,14),
-('light-meal','Light Meal','Light meal item','snack',array['Cold'],false,false,false,3,true,15)
+('juice','Juice','Choose box or bottle','drink',array['Cold'],false,false,false,2,true,11),
+('juice-bottle','Juice Bottle','Bottled juice','drink',array['Cold'],false,false,false,3,false,12),
+('juice-box','Juice Box','Boxed juice','drink',array['Cold'],false,false,false,2,false,13),
+('small-snack','Small Snack','Small snack item','snack',array['Cold'],false,false,false,1,true,14),
+('big-snack','Big Snack','Big snack item','snack',array['Cold'],false,false,false,2,true,15),
+('light-meal','Light Meal','Light meal item','snack',array['Cold'],false,false,false,3,true,16)
 on conflict (id) do nothing;
 
 update menu_drinks
 set active = false
+where id in ('juice-bottle', 'juice-box');
+
+update menu_drinks
+set active = true, description = 'Choose box or bottle', price = 2
 where id = 'juice';
 
 update menu_drinks
