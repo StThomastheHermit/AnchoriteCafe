@@ -870,6 +870,7 @@ begin
       left(coalesce(drink_item->>'desc', ''), 180),
       case
         when lower(coalesce(drink_item->>'category', 'coffee')) in ('coffee', 'refresher', 'smoothie', 'drink', 'snack') then lower(coalesce(drink_item->>'category', 'coffee'))
+        when lower(coalesce(drink_item->>'category', 'coffee')) in ('small-snack', 'big-snack', 'light-meal') then 'snack'
         else 'coffee'
       end,
       cleaned_temps,
