@@ -1834,9 +1834,23 @@ function AdminPage() {
 
 function ThemeEditor({ theme, busy, onChange, onPreset, onReset, onSave }) {
   const colors = normalizeTheme(theme);
+  const [draft, setDraft] = useState(colors);
+
+  useEffect(() => {
+    setDraft(colors);
+  }, [theme]);
 
   function updateColor(key, value) {
-    onChange({ ...colors, [key]: value });
+    setDraft(current => ({ ...current, [key]: value }));
+    if (/^#[0-9a-fA-F]{6}$/.test(value)) {
+      onChange({ ...colors, [key]: value });
+    }
+  }
+
+  function saveDraft() {
+    const normalized = normalizeTheme(draft);
+    setDraft(normalized);
+    onSave(normalized);
   }
 
   return (
@@ -1882,7 +1896,7 @@ function ThemeEditor({ theme, busy, onChange, onPreset, onReset, onSave }) {
               <span>{field.label}</span>
               <div>
                 <input type="color" value={colors[field.key]} disabled={busy} onChange={event => updateColor(field.key, event.target.value)} />
-                <input value={colors[field.key]} disabled={busy} onChange={event => updateColor(field.key, event.target.value)} />
+                <input value={draft[field.key] ?? ""} disabled={busy} onChange={event => updateColor(field.key, event.target.value)} onBlur={() => setDraft(current => ({ ...current, [field.key]: colors[field.key] }))} />
               </div>
             </label>
           ))}
@@ -1891,7 +1905,7 @@ function ThemeEditor({ theme, busy, onChange, onPreset, onReset, onSave }) {
 
       <div className="themeActions">
         <button className="ghostBtn" type="button" disabled={busy} onClick={onReset}>Reset</button>
-        <button className="primaryBtn compactPrimary" type="button" disabled={busy} onClick={() => onSave(colors)}>{busy ? "Saving..." : "Save theme"}</button>
+        <button className="primaryBtn compactPrimary" type="button" disabled={busy} onClick={saveDraft}>{busy ? "Saving..." : "Save theme"}</button>
       </div>
     </section>
   );
