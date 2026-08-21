@@ -458,7 +458,8 @@ as $$
     'ok', true,
     'drinks', arise_menu_json(arise_pin_matches(input_pin) or arise_employee_pin_matches(input_pin)),
     'milks', arise_inventory_menu_json(arise_pin_matches(input_pin) or arise_employee_pin_matches(input_pin))->'milks',
-    'syrups', arise_inventory_menu_json(arise_pin_matches(input_pin) or arise_employee_pin_matches(input_pin))->'syrups'
+    'syrups', arise_inventory_menu_json(arise_pin_matches(input_pin) or arise_employee_pin_matches(input_pin))->'syrups',
+    'toppings', arise_inventory_menu_json(arise_pin_matches(input_pin) or arise_employee_pin_matches(input_pin))->'toppings'
   );
 $$;
 
@@ -1389,7 +1390,7 @@ grant execute on function arise_place_order(jsonb) to anon;
 grant execute on function arise_update_admin(text, boolean, text) to anon;
 grant execute on function arise_update_status(text, text, text) to anon;
 grant execute on function arise_update_inventory(text, text, boolean) to anon;
-grant execute on function arise_save_menu(text, jsonb, jsonb, jsonb) to anon;
+grant execute on function arise_save_menu(text, jsonb, jsonb, jsonb, jsonb) to anon;
 grant execute on function arise_clear_completed(text) to anon;
 grant execute on function arise_clear_all(text) to anon;
 grant execute on function arise_archive(text, integer) to anon;
