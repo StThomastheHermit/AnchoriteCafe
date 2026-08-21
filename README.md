@@ -1,4 +1,4 @@
-# Arise Coffee Proper Efficiency Patch
+# Anchorite Cafe
 
 This patch starts from the stable working app and only makes safe efficiency changes.
 
@@ -9,7 +9,7 @@ This patch starts from the stable working app and only makes safe efficiency cha
 - Admin order refresh: 3 seconds
 - Customer refresh: 6 seconds
 - Keeps stable UI
-- Keeps Arise Coffee branding
+- Anchorite Cafe branding
 - Keeps max 3 syrups
 - Keeps Vercel `/admin` rewrite
 

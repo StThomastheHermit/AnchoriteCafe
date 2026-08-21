@@ -1,12 +1,12 @@
 {
-  "name": "Arise! Coffee",
-  "short_name": "Arise!",
-  "description": "Fast pickup coffee queue for Arise! Coffee.",
+  "name": "Anchorite Cafe",
+  "short_name": "Anchorite",
+  "description": "Fast pickup coffee queue for Anchorite Cafe.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#1C0A00",
-  "theme_color": "#1C0A00",
+  "background_color": "#061826",
+  "theme_color": "#00B8A9",
   "icons": [
     {
       "src": "/icons/arise-icon-192.png",

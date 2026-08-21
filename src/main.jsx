@@ -330,7 +330,7 @@ function Header({ isOpen, statusText }) {
     <header>
       <a className="brand" href="/">
         <span>☕</span>
-        <div><h1>Arise! Coffee</h1><p>Fresh Coffee • Fast Pickup</p></div>
+        <div><h1>Anchorite Cafe</h1><p>Coffee • Refreshers • Smoothies</p></div>
       </a>
       {!isAdminPage && <a className="adminLink" href="/admin">Admin Access</a>}
       <div className={isOpen ? "pill open" : "pill closed"}>{statusText || (isOpen ? "● Open" : "● Closed")}</div>
@@ -1444,15 +1444,14 @@ function DonationModal({ onClose }) {
     <div className="modalOverlay donationOverlay">
       <div className="donationModal">
         <div className="donationIcon">☕</div>
-        <h2>Support HTC</h2>
+        <h2>Payment</h2>
         <p>
-          Arise! Coffee is free, but donations help support Holy Transfiguration Church.
-          Thank you for helping keep this going.
+          Payment is not verified automatically. Please send Venmo or Zelle, then show staff your confirmation if asked.
         </p>
 
         <div className="donationActions">
           <a className="venmoBtn" href={DONATION_VENMO_URL} target="_blank" rel="noreferrer">
-            Donate with Venmo
+            Pay with Venmo
           </a>
           <button className="zelleBtn" onClick={copyZelle}>
             Zelle: {DONATION_ZELLE}
@@ -1497,12 +1496,12 @@ function IosInstallGate({ onRefresh }) {
     <main className="iosInstallPage">
       <section className="iosInstallCard">
         <div className="brandMark">☕</div>
-        <h1>Install Arise! Coffee</h1>
-        <p>On iPhone or iPad, please add Arise! Coffee to your Home Screen before ordering so ready notifications can work.</p>
+        <h1>Install Anchorite Cafe</h1>
+        <p>On iPhone or iPad, please add Anchorite Cafe to your Home Screen before ordering so ready notifications can work.</p>
         <ol>
           <li>Tap the Share button in Safari.</li>
           <li>Choose Add to Home Screen.</li>
-          <li>Open Arise! Coffee from the new Home Screen icon.</li>
+          <li>Open Anchorite Cafe from the new Home Screen icon.</li>
         </ol>
         <button className="joinBtn" onClick={onRefresh}>I opened it from Home Screen</button>
       </section>
@@ -2119,6 +2118,7 @@ function CustomerPage() {
 
                 <div className="paymentBox">
                   {lbl("Payment", "(required before checkout)")}
+                  <p className="paymentNote">The app records your selected method, but staff may still ask to see your Venmo or Zelle confirmation.</p>
                   <div className="paymentChoices">
                     {PAYMENT_OPTIONS.map(option => (
                       <button

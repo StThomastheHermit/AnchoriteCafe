@@ -6,7 +6,7 @@ self.addEventListener("push", event => {
     payload = {};
   }
 
-  const title = payload.title || "Arise! Coffee";
+  const title = payload.title || "Anchorite Cafe";
   const options = {
     body: payload.body || "Your order is ready. Please go to the kitchen.",
     icon: "/icons/arise-icon-192.png",

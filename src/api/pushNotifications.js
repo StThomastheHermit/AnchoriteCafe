@@ -20,7 +20,7 @@ export function isStandaloneApp() {
 
 export function getPushDeviceHint() {
   if (isAppleTouchDevice() && !isStandaloneApp()) {
-    return "iPhone/iPad: for ready notifications on future orders, tap Share, Add to Home Screen, then open Arise! Coffee from there.";
+    return "iPhone/iPad: for ready notifications on future orders, tap Share, Add to Home Screen, then open Anchorite Cafe from there.";
   }
 
   return "";
