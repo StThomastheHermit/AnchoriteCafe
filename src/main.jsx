@@ -149,7 +149,7 @@ function getDrink(id, drinks = DRINKS) {
 }
 
 function defaultForm() {
-  return { name: "", drinkId: "latte", temp: "Hot", milk: "", syrups: [], toppings: [], notes: "" };
+  return { name: "", drinkId: "latte", temp: "Hot", milk: "", syrups: [], toppings: [], lightIce: false, notes: "" };
 }
 
 function defaultInventory() {
@@ -274,6 +274,7 @@ function savedOrderSummary(order) {
   if (!order?.drinkLabel) return "";
   const parts = [order.temp, order.drinkLabel, order.milk].filter(Boolean);
   if (Array.isArray(order.syrups) && order.syrups.length) parts.push(order.syrups.join(", "));
+  if (order.lightIce) parts.push("Light ice");
   return parts.join(" · ");
 }
 
@@ -1922,16 +1923,24 @@ function CustomerPage() {
     const d = getDrink(form.drinkId, customerDrinks);
     const pending = pendingLastOrderRef.current;
     pendingLastOrderRef.current = null;
+    const nextTemp = pending?.temp || d.temps[0];
     setForm(f => ({
       ...f,
-      temp: pending?.temp || d.temps[0],
+      temp: nextTemp,
       milk: pending?.milk || "",
       syrups: pending?.syrups || [],
       toppings: pending?.toppings || [],
+      lightIce: nextTemp === "Cold" && Boolean(pending?.lightIce),
       notes: pending?.notes ?? f.notes,
     }));
     setErrors({});
   }, [form.drinkId, customerDrinks]);
+
+  useEffect(() => {
+    if (form.temp !== "Cold" && form.lightIce) {
+      setForm(f => ({ ...f, lightIce: false }));
+    }
+  }, [form.temp, form.lightIce]);
 
   useEffect(() => {
     if (!customerDrinks.some(d => d.id === form.drinkId)) {
@@ -1961,22 +1970,25 @@ function CustomerPage() {
     if (item.milk) parts.push(item.milk);
     if (item.syrups.length) parts.push(item.syrups.join(", "));
     if (item.toppings.length) parts.push(item.toppings.join(", "));
+    if (item.lightIce) parts.push("Light ice");
     parts.push(formatPrice(item.price));
     return parts.join(" · ");
   }
 
   function buildCartItem() {
     const toppings = drink.category === "refresher" ? (form.toppings || []) : [];
+    const temp = drink.showTemp === false ? drink.temps[0] : form.temp;
     return {
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       name: form.name.trim(),
       drink: drink.label,
       drinkId: form.drinkId,
       category: drink.category,
-      temp: drink.showTemp === false ? drink.temps[0] : form.temp,
+      temp,
       milk: drink.milk ? form.milk : "",
       syrups: drink.syrups ? form.syrups : [],
       toppings,
+      lightIce: temp === "Cold" && form.lightIce,
       price: priceForCategory(drink.category),
       notes: form.notes.trim(),
     };
@@ -2062,7 +2074,7 @@ function CustomerPage() {
       ? lastOrder.syrups.filter(s => isInventoryAvailable(inventoryLookup, s)).slice(0, MAX_SYRUPS)
       : [];
 
-    pendingLastOrderRef.current = { temp: nextTemp, milk: nextMilk, syrups: nextSyrups, notes: lastOrder.notes || "" };
+    pendingLastOrderRef.current = { temp: nextTemp, milk: nextMilk, syrups: nextSyrups, lightIce: nextTemp === "Cold" && Boolean(lastOrder.lightIce), notes: lastOrder.notes || "" };
     setForm(f => ({ ...f, drinkId: savedDrink.id }));
     setErrors({});
   }
@@ -2098,6 +2110,7 @@ function CustomerPage() {
           "Payment: Zelle",
           "Payment verification: staff must confirm manually",
           item.toppings.length ? `Refresher toppings: ${item.toppings.join(", ")}` : "",
+          item.lightIce ? "Light ice" : "",
           item.notes,
         ].filter(Boolean);
         const data = await apiPost({
@@ -2131,6 +2144,7 @@ function CustomerPage() {
         temp: first.temp,
         milk: first.milk,
         syrups: first.syrups,
+        lightIce: first.lightIce,
         notes: first.notes,
         expiresAt: Date.now() + LAST_ORDER_TTL_MS,
       };
@@ -2147,7 +2161,7 @@ function CustomerPage() {
         temp: first.temp,
         milk: first.milk,
         syrups: [...first.syrups, ...first.toppings].join(", "),
-        notes: "Paid with Zelle; staff confirmation may be needed",
+        notes: [first.lightIce ? "Light ice" : "", "Paid with Zelle; staff confirmation may be needed"].filter(Boolean).join(" | "),
         status: "waiting",
         position: Number(firstResponse.position || 1)
       });
@@ -2270,9 +2284,20 @@ function CustomerPage() {
               {drink.showTemp !== false && (drink.temps.length > 1 ? (
                 <div className="field">
                   {lbl("Temperature")}
-                  <div className="row">{drink.temps.map(t => <button key={t} className={form.temp === t ? "choice active" : "choice"} onClick={() => setForm(f => ({...f, temp: t}))}>{t}</button>)}</div>
+                  <div className="row">{drink.temps.map(t => <button key={t} className={form.temp === t ? "choice active" : "choice"} onClick={() => setForm(f => ({...f, temp: t, lightIce: t === "Cold" ? f.lightIce : false}))}>{t}</button>)}</div>
                 </div>
               ) : <div className="servedOnly">Served <strong>{drink.temps[0].toLowerCase()}</strong> only</div>)}
+
+              {(drink.showTemp === false ? drink.temps[0] : form.temp) === "Cold" && (
+                <div className="field">
+                  {lbl("Ice")}
+                  <div className="row">
+                    <button className={form.lightIce ? "choice active" : "choice"} onClick={() => setForm(f => ({ ...f, lightIce: !f.lightIce }))}>
+                      {form.lightIce ? "✓ Light ice" : "Light ice"}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {drink.milk && <div className="field">
                 {lbl("Milk", "(required)")}
