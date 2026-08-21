@@ -1893,6 +1893,22 @@ input:focus,textarea:focus{
   .readyDisplayCard p{font-size:24px}
 }
 
+html,body,#root{
+  max-width:100%;
+  overflow-x:hidden;
+}
+body{
+  position:relative;
+}
+.layout,.adminPage,.closedPage,.pinPage,.iosInstallPage{
+  max-width:100vw;
+  overflow-x:hidden;
+}
+.iosInstallCard,.modal,.menuPanel,.menuSectionCard,.menuEditorItem,.ingredientEditorItem{
+  max-width:100%;
+  min-width:0;
+}
+
 .drink strong{
   display:flex;
   align-items:center;
