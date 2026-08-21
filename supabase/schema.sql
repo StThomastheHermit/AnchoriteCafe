@@ -183,7 +183,10 @@ insert into menu_drinks (id, label, description, category, temps, has_milk, has_
 on conflict (id) do nothing;
 
 insert into settings (key, value) values
-('pin','"8246"'),
+('pin','"1972"')
+on conflict (key) do update set value = excluded.value;
+
+insert into settings (key, value) values
 ('isOpen','"true"'),
 ('message','""')
 on conflict (key) do nothing;
