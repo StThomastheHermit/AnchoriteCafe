@@ -330,7 +330,7 @@ function Header({ isOpen, statusText }) {
     <header>
       <a className="brand" href="/">
         <span>☕</span>
-        <div><h1>Anchorite Cafe</h1><p>Coffee • Refreshers • Smoothies</p></div>
+        <div><h1>Anchorite Cafe</h1><p>Faith fueled soul rooted</p></div>
       </a>
       {!isAdminPage && <a className="adminLink" href="/admin">Admin Access</a>}
       <div className={isOpen ? "pill open" : "pill closed"}>{statusText || (isOpen ? "● Open" : "● Closed")}</div>
