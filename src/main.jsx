@@ -4,7 +4,7 @@ import "./style.css";
 import { apiGet, apiPost } from "./api/backend";
 import { getPushDeviceHint, getPushSupportStatus, isAppleTouchDevice, isStandaloneApp, sendReadyNotification, subscribeToReadyNotification } from "./api/pushNotifications";
 
-const DONATION_ZELLE = "htacoc@gmail.com";
+const DONATION_ZELLE = "Donate@stthomascoc.org";
 const ZELLE_PAYMENT_URL = "";
 const INVENTORY_CACHE_KEY = "arise-inventory-cache";
 const INVENTORY_CACHE_MS = 5 * 60 * 1000;
