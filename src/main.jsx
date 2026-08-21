@@ -356,7 +356,7 @@ function PinGate({ onSuccess }) {
     setError("");
     try {
       const result = await apiPost({ action: "login", pin: value });
-      if (result.ok) onSuccess(value);
+      if (result.ok) onSuccess(value, result);
       else {
         setError("Wrong PIN");
         setPin("");
@@ -412,7 +412,7 @@ function PinGate({ onSuccess }) {
     <main className="pinPage">
       <div className="modal pinModal static">
         <h2>Admin Access</h2>
-        <p>Enter the PIN from the Settings tab.</p>
+        <p>Enter the owner PIN or your employee PIN.</p>
         <div className="pinDots">{[0,1,2,3].map(i => <span key={i} className={pin.length > i ? "filled" : ""} />)}</div>
         {error && <div className="errorText">{error}</div>}
         {busy && <div className="checkingLine"><span className="miniSpinner"></span>Checking PIN…</div>}
@@ -434,6 +434,7 @@ function PinGate({ onSuccess }) {
 
 function AdminPage() {
   const [pin, setPin] = useState("");
+  const [auth, setAuth] = useState(null);
   const [isOpen, setIsOpen] = useState(true);
   const [message, setMessage] = useState("");
   const [orders, setOrders] = useState([]);
@@ -470,6 +471,8 @@ function AdminPage() {
   const messageEditingRef = useRef(false);
   const adminSyrups = useMemo(() => inventoryItemsByType(inventory, "syrup", SYRUPS), [inventory]);
   const adminMilks = useMemo(() => inventoryItemsByType(inventory, "milk", MILKS), [inventory]);
+  const isOwner = auth?.role === "owner";
+  const isEmployee = auth?.role === "employee";
   const clockedInEmployees = useMemo(() => (timeClock.totals || []).filter(total => total.clockedIn), [timeClock]);
   const openShiftEntries = useMemo(() => (timeClock.entries || []).filter(entry => !entry.clockOut), [timeClock]);
 
@@ -533,7 +536,12 @@ function AdminPage() {
   }
 
   async function refreshAdminData() {
-    await Promise.all([refreshOrders(), refreshStatus(), refreshInventory(), loadTimeClock()]);
+    await Promise.all([
+      refreshOrders(),
+      refreshStatus(),
+      isOwner ? refreshInventory() : Promise.resolve(),
+      isOwner ? loadTimeClock() : Promise.resolve(),
+    ]);
   }
 
   useEffect(() => {
@@ -563,6 +571,10 @@ function AdminPage() {
   }, [pin]);
 
   async function saveAdmin(payload) {
+    if (!isOwner) {
+      alert("Owner PIN required.");
+      return;
+    }
     if (payload.isOpen === false && isOpen && clockedInEmployees.length > 0) {
       const names = clockedInEmployees.map(employee => employee.name).join(", ");
       const ok = confirm(`Employees still clocked in: ${names}. Close the queue anyway?`);
@@ -742,6 +754,7 @@ function AdminPage() {
   }
 
   async function openTimeClockScreen() {
+    if (!isOwner) return;
     setAdminView("timeclock");
     if (!timeClockLoaded) await loadTimeClock();
   }
@@ -829,6 +842,7 @@ function AdminPage() {
   }
 
   async function openMenuScreen() {
+    if (!isOwner) return;
     setMenuOpen(true);
     setAdminView("menu");
     if (!menuLoaded) await loadMenu();
@@ -972,7 +986,7 @@ function AdminPage() {
   if (!pin) {
     return <>
       <Header isOpen={isOpen} statusText="Admin" />
-      <PinGate onSuccess={p => { setPin(p); }} />
+      <PinGate onSuccess={(p, result) => { setPin(p); setAuth(result); }} />
     </>;
   }
 
@@ -1205,8 +1219,8 @@ function AdminPage() {
       <main className="adminPage">
         <section className="adminTop">
           <div>
-            <h2>Admin Control</h2>
-            <p className="sub">Orders update automatically.</p>
+              <h2>{isOwner ? "Admin Control" : "Order Dashboard"}</h2>
+              <p className="sub">{isOwner ? "Orders update automatically." : "Take orders through the queue and update statuses."}</p>
             <div className="adminMeta">
               <span>Active orders: {visibleOrders.length}</span>
               <span className={connectionOk ? "online" : "offline"}>{connectionOk ? "Online" : "Connection issue"}</span>
@@ -1216,11 +1230,11 @@ function AdminPage() {
           </div>
           <div className="adminTopActions">
             <button className="ghostBtn" onClick={refreshAdminData}>Refresh</button>
-            <button className="ghostBtn" onClick={() => { setPin(""); }}>Log out</button>
+            <button className="ghostBtn" onClick={() => { setPin(""); setAuth(null); }}>Log out</button>
           </div>
         </section>
 
-        {clockedInEmployees.length > 0 && (
+        {isOwner && clockedInEmployees.length > 0 && (
           <section className="clockBanner">
             <div>
               <strong>{clockedInEmployees.length} clocked in</strong>
@@ -1230,7 +1244,16 @@ function AdminPage() {
           </section>
         )}
 
-        <section className="adminCommandCenter">
+        {isEmployee && (
+          <section className="clockBanner employeeAdminBanner">
+            <div>
+              <strong>Order-taking access</strong>
+              <span>{auth?.employee?.name ? `Signed in as ${auth.employee.name}` : "Employee PIN active"}</span>
+            </div>
+          </section>
+        )}
+
+        {isOwner && <section className="adminCommandCenter">
           <div className="queueCommand">
             <div>
               <div className="label">Queue Status</div>
@@ -1245,9 +1268,9 @@ function AdminPage() {
             <button className="ghostBtn" onClick={clearCompleted}>Archive ready ({readyArchiveCount})</button>
             <button className="dangerOutlineBtn" onClick={clearAll}>Clear all after close</button>
           </div>
-        </section>
+        </section>}
 
-        <section className="adminTools">
+        {isOwner && <section className="adminTools">
           <button className="toolTile" onClick={openMenuScreen}>
             <strong>Menu</strong>
             <span>Drinks, milks, syrups</span>
@@ -1264,9 +1287,9 @@ function AdminPage() {
             <strong>Time Clock</strong>
             <span>Employee hours</span>
           </button>
-        </section>
+        </section>}
 
-        <section className="panel closedMessagePanel">
+        {isOwner && <section className="panel closedMessagePanel">
           <div className="label">Closed message</div>
           <textarea
             value={message}
@@ -1280,9 +1303,9 @@ function AdminPage() {
           />
           <button className="primaryBtn" disabled={busy} onClick={() => saveAdmin({ isOpen, message })}>Save message</button>
           {notice && <div className="notice">{notice}</div>}
-        </section>
+        </section>}
 
-        <section className="inventoryPanel">
+        {isOwner && <section className="inventoryPanel">
           <div className="sectionHeader">
             <div>
               <h2>Syrup & Milk Inventory</h2>
@@ -1328,7 +1351,7 @@ function AdminPage() {
               </div>
             </>
           )}
-        </section>
+        </section>}
 
         <section className="orders">
           <div className="sectionHeader">

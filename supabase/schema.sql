@@ -236,6 +236,21 @@ as $$
   select coalesce(input_pin, '') = arise_setting('pin', '');
 $$;
 
+create or replace function arise_employee_pin_matches(input_pin text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from employees
+    where pin = trim(coalesce(input_pin, ''))
+      and active = true
+  );
+$$;
+
 create or replace function arise_inventory_json()
 returns jsonb
 language sql
@@ -396,15 +411,39 @@ $$;
 
 create or replace function arise_login(input_pin text)
 returns jsonb
-language sql
+language plpgsql
 stable
 security definer
 set search_path = public
 as $$
-  select case
-    when arise_pin_matches(input_pin) then jsonb_build_object('ok', true)
-    else jsonb_build_object('ok', false, 'error', 'Wrong PIN')
-  end;
+declare
+  found_employee employees;
+begin
+  if arise_pin_matches(input_pin) then
+    return jsonb_build_object('ok', true, 'role', 'owner');
+  end if;
+
+  select *
+  into found_employee
+  from employees
+  where pin = trim(coalesce(input_pin, ''))
+    and active = true
+  limit 1;
+
+  if found_employee is not null then
+    return jsonb_build_object(
+      'ok', true,
+      'role', 'employee',
+      'employee', jsonb_build_object(
+        'id', found_employee.id,
+        'name', found_employee.name,
+        'active', found_employee.active
+      )
+    );
+  end if;
+
+  return jsonb_build_object('ok', false, 'error', 'Wrong PIN');
+end;
 $$;
 
 create or replace function arise_orders()
@@ -605,7 +644,7 @@ security definer
 set search_path = public
 as $$
 begin
-  if not arise_pin_matches(input_pin) then
+  if not (arise_pin_matches(input_pin) or arise_employee_pin_matches(input_pin)) then
     return jsonb_build_object('ok', false, 'error', 'Wrong PIN');
   end if;
 
@@ -635,7 +674,7 @@ declare
   updated_order orders;
   order_state jsonb;
 begin
-  if not arise_pin_matches(input_pin) then
+  if not (arise_pin_matches(input_pin) or arise_employee_pin_matches(input_pin)) then
     return jsonb_build_object('ok', false, 'error', 'Wrong PIN');
   end if;
 
