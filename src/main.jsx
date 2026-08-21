@@ -2436,11 +2436,11 @@ function CustomerPage() {
                 <div className="drinkGroups">
                   {drinksByCategory.map(category => (
                     <div className="drinkGroup" key={category.id}>
-                      <h3>{category.label} <span>{category.items.some(item => Number(item.price) !== priceForCategory(category.id)) ? "priced by item" : formatPrice(priceForCategory(category.id))}</span></h3>
+                      <h3>{category.label}</h3>
                       <div className="drinkList">
                         {category.drinks.map(d => (
                           <button key={d.id} className={form.drinkId === d.id ? "drink active" : "drink"} onClick={() => setForm(f => ({...f, drinkId: d.id}))}>
-                            <strong>{d.label}</strong>
+                            <strong>{d.label} <em>{formatPrice(priceForDrink(d))}</em></strong>
                             <span>{d.desc}</span>
                           </button>
                         ))}

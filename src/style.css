@@ -1893,6 +1893,43 @@ input:focus,textarea:focus{
   .readyDisplayCard p{font-size:24px}
 }
 
+.drink strong{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+.drink strong em{
+  color:var(--gold);
+  font-style:normal;
+  font-size:12px;
+  white-space:nowrap;
+}
+.menuCardBody{
+  grid-template-columns:minmax(150px,.9fr) minmax(100px,.35fr) minmax(220px,1.2fr);
+}
+.menuCardControls{
+  grid-template-columns:1fr;
+  overflow:hidden;
+}
+.menuTempRow{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.menuTempRow .choice{
+  flex:0 1 auto;
+  min-width:118px;
+  max-width:100%;
+  white-space:normal;
+  line-height:1.2;
+}
+@media(max-width:900px){
+  .menuCardBody{
+    grid-template-columns:1fr;
+  }
+}
+
 /* Softer menu editor surfaces */
 .menuPanel{
   background:rgba(40,19,2,.38);
