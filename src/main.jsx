@@ -801,6 +801,22 @@ function AdminPage() {
     }
   }
 
+  async function deleteEmployee(employee) {
+    const name = employee?.name || "this employee";
+    if (!confirm(`Delete ${name}?`)) return;
+    if (!confirm(`This will permanently delete ${name} and all of their timesheets. Continue?`)) return;
+    setTimeClockBusy(true);
+    try {
+      const data = await apiPost({ action: "deleteEmployee", pin, employeeId: employee.id });
+      if (data.ok) await loadTimeClock();
+      else alert(data.error || "Could not delete employee");
+    } catch {
+      alert("Connection error");
+    } finally {
+      setTimeClockBusy(false);
+    }
+  }
+
   async function closeShift(entry) {
     const ok = confirm(`Clock out ${entry.employeeName || "this employee"} now?`);
     if (!ok) return;
@@ -1192,6 +1208,7 @@ function AdminPage() {
                     </div>
                     <span className={total.clockedIn ? "menuState active" : "menuState"}>{total.clockedIn ? "Clocked in" : "Out"}</span>
                     <button className="ghostBtn" disabled={timeClockBusy} onClick={() => toggleEmployee(employee)}>{employee.active === false ? "Reactivate" : "Deactivate"}</button>
+                    <button className="dangerOutlineBtn" disabled={timeClockBusy} onClick={() => deleteEmployee(employee)}>Delete employee and timesheets</button>
                   </div>
                 );
               })}

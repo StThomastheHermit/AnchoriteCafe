@@ -1496,6 +1496,46 @@ begin
 end;
 $$;
 
+drop function if exists arise_delete_employee(text, text);
+create or replace function arise_delete_employee(input_pin text, input_employee_id text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  deleted_employee employees;
+  deleted_entries integer := 0;
+begin
+  if not arise_pin_matches(input_pin) then
+    return jsonb_build_object('ok', false, 'error', 'Wrong PIN');
+  end if;
+
+  if coalesce(input_employee_id, '') = '' then
+    return jsonb_build_object('ok', false, 'error', 'Employee not found');
+  end if;
+
+  delete from time_entries
+  where employee_id::text = input_employee_id;
+
+  get diagnostics deleted_entries = row_count;
+
+  delete from employees
+  where id::text = input_employee_id
+  returning * into deleted_employee;
+
+  if deleted_employee is null then
+    return jsonb_build_object('ok', false, 'error', 'Employee not found');
+  end if;
+
+  return jsonb_build_object(
+    'ok', true,
+    'employee', arise_employee_json(deleted_employee),
+    'deletedEntries', deleted_entries
+  );
+end;
+$$;
+
 drop function if exists arise_close_shift(text, text);
 create or replace function arise_close_shift(input_pin text, input_entry_id text)
 returns jsonb
@@ -1523,3 +1563,10 @@ begin
   return jsonb_build_object('ok', true, 'entry', arise_time_entry_json(saved_entry));
 end;
 $$;
+
+grant execute on function arise_time_clock(text) to anon;
+grant execute on function arise_time_clock_admin(text) to anon;
+grant execute on function arise_save_employee(text, jsonb) to anon;
+grant execute on function arise_toggle_employee(text, text, boolean) to anon;
+grant execute on function arise_delete_employee(text, text) to anon;
+grant execute on function arise_close_shift(text, text) to anon;

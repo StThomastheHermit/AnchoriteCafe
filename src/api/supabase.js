@@ -47,6 +47,7 @@ export async function apiPost(payload) {
   if (payload.action === "timeClockAdmin") return getTimeClockAdmin(payload.pin);
   if (payload.action === "saveEmployee") return saveEmployee(payload.pin, payload.employee);
   if (payload.action === "toggleEmployee") return toggleEmployee(payload.pin, payload.employeeId, payload.active);
+  if (payload.action === "deleteEmployee") return deleteEmployee(payload.pin, payload.employeeId);
   if (payload.action === "closeShift") return closeShift(payload.pin, payload.entryId);
   if (payload.action === "saveMenu") return saveMenu(payload.pin, {
     drinks: payload.drinks,
@@ -90,6 +91,17 @@ export async function toggleEmployee(pin, employeeId, active) {
       input_pin: String(pin || ""),
       input_employee_id: employeeId ? String(employeeId) : null,
       input_active: active !== false,
+    });
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) };
+  }
+}
+
+export async function deleteEmployee(pin, employeeId) {
+  try {
+    return await callRpc("arise_delete_employee", {
+      input_pin: String(pin || ""),
+      input_employee_id: employeeId ? String(employeeId) : null,
     });
   } catch (error) {
     return { ok: false, error: errorMessage(error) };
