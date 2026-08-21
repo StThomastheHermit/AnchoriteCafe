@@ -10,6 +10,7 @@ function errorMessage(error) {
 }
 
 async function callRpc(name, args = {}, fallback = { ok: false, error: "Connection error" }) {
+  if (!supabase) return fallback;
   const { data, error } = await supabase.rpc(name, args);
   if (error) throw error;
   return normalizeResponse(data, fallback);
@@ -55,6 +56,7 @@ export async function apiPost(payload) {
     drinks: payload.drinks,
     milks: payload.milks,
     syrups: payload.syrups,
+    toppings: payload.toppings,
   });
 
   return { ok: false, error: "Unknown action" };
@@ -299,6 +301,7 @@ export async function saveMenu(pin, menu) {
       input_drinks: Array.isArray(menu?.drinks) ? menu.drinks : [],
       input_milks: Array.isArray(menu?.milks) ? menu.milks : [],
       input_syrups: Array.isArray(menu?.syrups) ? menu.syrups : [],
+      input_toppings: Array.isArray(menu?.toppings) ? menu.toppings : [],
     });
   } catch (error) {
     return { ok: false, error: errorMessage(error) };
