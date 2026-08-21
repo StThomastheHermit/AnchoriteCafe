@@ -2672,7 +2672,6 @@ function EmployeeClockPage() {
 
 function StaffClockAccessPage() {
   const clockUrl = `${window.location.origin}${CLOCK_PATH}`;
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=12&data=${encodeURIComponent(clockUrl)}`;
 
   async function copyClockLink() {
     try {
@@ -2689,10 +2688,7 @@ function StaffClockAccessPage() {
       <main className="pinPage clockPage">
         <section className="modal pinModal static clockCard staffClockCard">
           <h2>Staff Clock</h2>
-          <p>Scan this code on your phone, then enter your personal PIN.</p>
-          <div className="clockQrWrap">
-            <img src={qrUrl} alt="QR code for employee clock-in" />
-          </div>
+          <p>Share this link with employees so they can clock in or out from their phone.</p>
           <a className="joinBtn clockLargeLink" href={CLOCK_PATH}>Clock In / Out</a>
           <button className="ghostBtn" onClick={copyClockLink}>Copy clock link</button>
           <div className="clockLinkText">{clockUrl}</div>
