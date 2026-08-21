@@ -622,6 +622,12 @@ function AdminPage() {
     };
   }, [pin]);
 
+  useEffect(() => {
+    if (pin && canWorkQueue && !menuLoaded) {
+      loadMenu();
+    }
+  }, [pin, canWorkQueue, menuLoaded]);
+
   async function saveAdmin(payload) {
     if (!canWorkQueue) {
       alert("PIN required.");
@@ -694,6 +700,39 @@ function AdminPage() {
       alert("Connection error");
     }
     setBusy(false);
+  }
+
+  async function toggleMenuItemAvailability(drinkId) {
+    const currentDrink = menuDrinks.find(drink => drink.id === drinkId);
+    if (!currentDrink) return;
+    const nextDrinks = menuDrinks.map(drink => drink.id === drinkId ? { ...drink, active: !drink.active } : drink);
+    if (!nextDrinks.some(drink => drink.active)) {
+      alert("Keep at least one menu item available.");
+      return;
+    }
+
+    setMenuDrinks(nextDrinks);
+    setMenuBusy(true);
+    try {
+      const cleaned = normalizeMenuDrinks(nextDrinks, true).map((drink, index) => ({ ...drink, sortOrder: index }));
+      const cleanedMilks = normalizeIngredientList(menuMilks, "milk", MILKS, true).map((item, index) => ({ ...item, sortOrder: index }));
+      const cleanedSyrups = normalizeIngredientList(menuSyrups, "syrup", SYRUPS, true).map((item, index) => ({ ...item, sortOrder: index }));
+      const data = await apiPost({ action: "saveMenu", pin, drinks: cleaned, milks: cleanedMilks, syrups: cleanedSyrups });
+      if (data.ok) {
+        setMenuDrinks(normalizeMenuDrinks(data.drinks || cleaned, true));
+        setMenuMilks(normalizeIngredientList(data.milks || cleanedMilks, "milk", MILKS, true));
+        setMenuSyrups(normalizeIngredientList(data.syrups || cleanedSyrups, "syrup", SYRUPS, true));
+        setMenuLoaded(true);
+      } else {
+        setMenuDrinks(menuDrinks);
+        alert(data.error || "Could not update menu item");
+      }
+    } catch {
+      setMenuDrinks(menuDrinks);
+      alert("Connection error");
+    } finally {
+      setMenuBusy(false);
+    }
   }
 
   async function clearCompleted() {
@@ -1535,6 +1574,23 @@ function AdminPage() {
 
           {!collapsedPanels.inventory && (
             <>
+              <div className="inventoryGroup">
+                <div className="label">Menu Items</div>
+                <div className="inventoryGrid menuInventoryGrid">
+                  {menuDrinks.map(item => (
+                    <button
+                      key={item.id}
+                      disabled={menuBusy}
+                      className={item.active ? "inventoryToggle available" : "inventoryToggle out"}
+                      onClick={() => toggleMenuItemAvailability(item.id)}
+                    >
+                      <span>{item.label}</span>
+                      <strong>{item.active ? "Available" : "Out of stock"}</strong>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="inventoryGroup">
                 <div className="label">Syrups</div>
                 <div className="inventoryGrid">

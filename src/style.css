@@ -420,6 +420,9 @@ input:focus,textarea:focus{outline:2px solid #C8823A}
   grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
   gap:8px;
 }
+.menuInventoryGrid{
+  grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+}
 .inventoryToggle{
   text-align:left;
   padding:11px 12px;
