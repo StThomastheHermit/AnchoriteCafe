@@ -78,6 +78,24 @@ input:focus,textarea:focus{outline:2px solid #C8823A}
 .paymentChoice.active{background:rgba(200,130,58,.18);border-color:#C8823A}
 .paymentLink{display:block;margin-top:9px;padding:9px 11px;border-radius:6px;background:rgba(107,191,107,.10);border:1px solid rgba(107,191,107,.24);color:#6BBF6B;font-size:12px;font-weight:700;text-align:center}
 .paymentLink.static{color:#8A9B8E}
+.employeeForm{display:grid;grid-template-columns:1fr 140px auto;gap:10px;margin-bottom:16px}
+.employeeGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+.employeeCard{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;background:rgba(255,246,232,.07);border:1px solid var(--line);border-radius:12px;padding:14px}
+.employeeCard.inactive{opacity:.62}
+.employeeCard p{color:var(--muted);font-size:12px;margin-top:3px}
+.employeeCard button{grid-column:1 / -1}
+.timeEntryList{display:flex;flex-direction:column;gap:8px}
+.timeEntry{display:grid;grid-template-columns:1.1fr 1.4fr 1.4fr auto;gap:10px;align-items:center;background:rgba(255,246,232,.07);border:1px solid var(--line);border-radius:10px;padding:12px;color:var(--muted);font-size:12px}
+.timeEntry strong{color:var(--text);font-size:13px}
+.timeEntry em{color:var(--gold);font-style:normal;font-weight:800;text-align:right}
+.clockCard{display:flex;flex-direction:column;gap:12px}
+.clockCard p{margin-bottom:0}
+.clockResult{border-radius:12px;border:1px solid var(--line);background:rgba(255,246,232,.08);padding:14px;text-align:left}
+.clockResult strong,.clockResult span{display:block}
+.clockResult span{color:var(--green);font-weight:800;margin-top:3px}
+.clockResult.out span{color:var(--gold)}
+.clockResult p{color:var(--muted);font-size:12px;margin-top:4px}
+.clockAdminLink{align-self:center;margin-top:2px}
 
 .empty{color:#4A3020;text-align:center;padding:44px 20px;border:1px dashed rgba(200,130,58,.12);border-radius:8px}
 .empty div{font-size:30px;opacity:.25;margin-bottom:10px}
@@ -1037,6 +1055,7 @@ input:focus,textarea:focus{
   header{
     flex-wrap:wrap;
   }
+  .employeeForm,.timeEntry{grid-template-columns:1fr}
   .brand{
     flex:1 1 100%;
   }

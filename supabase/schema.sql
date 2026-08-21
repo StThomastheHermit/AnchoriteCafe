@@ -85,6 +85,33 @@ create table if not exists archived_orders (
   order_data jsonb not null
 );
 
+create table if not exists employees (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  pin text not null unique,
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+alter table employees add column if not exists name text;
+alter table employees add column if not exists pin text;
+alter table employees add column if not exists active boolean not null default true;
+alter table employees add column if not exists created_at timestamptz not null default now();
+create unique index if not exists employees_pin_key on employees (pin);
+
+create table if not exists time_entries (
+  id uuid primary key default gen_random_uuid(),
+  employee_id uuid not null references employees(id) on delete cascade,
+  clock_in timestamptz not null default now(),
+  clock_out timestamptz,
+  created_at timestamptz not null default now()
+);
+
+alter table time_entries add column if not exists employee_id uuid references employees(id) on delete cascade;
+alter table time_entries add column if not exists clock_in timestamptz not null default now();
+alter table time_entries add column if not exists clock_out timestamptz;
+alter table time_entries add column if not exists created_at timestamptz not null default now();
+
 alter table archived_orders add column if not exists original_order_id_text text;
 alter table archived_orders add column if not exists original_created_at timestamptz;
 alter table archived_orders add column if not exists customer_name text;
@@ -166,12 +193,16 @@ alter table inventory enable row level security;
 alter table menu_drinks enable row level security;
 alter table settings enable row level security;
 alter table archived_orders enable row level security;
+alter table employees enable row level security;
+alter table time_entries enable row level security;
 
 revoke all on orders from anon;
 revoke all on inventory from anon;
 revoke all on menu_drinks from anon;
 revoke all on settings from anon;
 revoke all on archived_orders from anon;
+revoke all on employees from anon;
+revoke all on time_entries from anon;
 grant delete on archived_orders to anon;
 
 drop function if exists arise_order(uuid);
@@ -1151,3 +1182,237 @@ begin
   );
 end;
 $cron_setup$;
+
+drop function if exists arise_time_entry_json(time_entries);
+create or replace function arise_time_entry_json(input_entry time_entries)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select jsonb_build_object(
+    'id', (input_entry).id,
+    'employeeId', (input_entry).employee_id,
+    'clockIn', (input_entry).clock_in,
+    'clockOut', (input_entry).clock_out,
+    'hours', case
+      when (input_entry).clock_out is null then null
+      else round((extract(epoch from ((input_entry).clock_out - (input_entry).clock_in)) / 3600.0)::numeric, 2)
+    end
+  );
+$$;
+
+drop function if exists arise_employee_json(employees);
+create or replace function arise_employee_json(input_employee employees)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select jsonb_build_object(
+    'id', (input_employee).id,
+    'name', (input_employee).name,
+    'pin', (input_employee).pin,
+    'active', (input_employee).active
+  );
+$$;
+
+drop function if exists arise_time_clock(text);
+create or replace function arise_time_clock(input_employee_pin text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  found_employee employees;
+  open_entry time_entries;
+  saved_entry time_entries;
+begin
+  select *
+  into found_employee
+  from employees
+  where pin = trim(coalesce(input_employee_pin, ''))
+    and active = true
+  limit 1;
+
+  if found_employee is null then
+    return jsonb_build_object('ok', false, 'error', 'Wrong PIN');
+  end if;
+
+  select *
+  into open_entry
+  from time_entries
+  where employee_id = found_employee.id
+    and clock_out is null
+  order by clock_in desc
+  limit 1;
+
+  if open_entry is null then
+    insert into time_entries (employee_id, clock_in)
+    values (found_employee.id, now())
+    returning * into saved_entry;
+
+    return jsonb_build_object(
+      'ok', true,
+      'action', 'clocked_in',
+      'employee', arise_employee_json(found_employee),
+      'entry', arise_time_entry_json(saved_entry)
+    );
+  end if;
+
+  update time_entries
+  set clock_out = now()
+  where id = open_entry.id
+  returning * into saved_entry;
+
+  return jsonb_build_object(
+    'ok', true,
+    'action', 'clocked_out',
+    'employee', arise_employee_json(found_employee),
+    'entry', arise_time_entry_json(saved_entry)
+  );
+end;
+$$;
+
+drop function if exists arise_time_clock_admin(text);
+create or replace function arise_time_clock_admin(input_pin text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  with recent_entries as (
+    select
+      te.*,
+      e.name as employee_name
+    from time_entries te
+    join employees e on e.id = te.employee_id
+    where te.clock_in >= now() - interval '30 days'
+    order by te.clock_in desc
+    limit 100
+  ),
+  employee_totals as (
+    select
+      e.id,
+      e.name,
+      coalesce(round(sum(extract(epoch from (coalesce(te.clock_out, now()) - te.clock_in)) / 3600.0)::numeric, 2), 0) as hours_30_days,
+      exists (
+        select 1
+        from time_entries open_te
+        where open_te.employee_id = e.id
+          and open_te.clock_out is null
+      ) as clocked_in
+    from employees e
+    left join time_entries te
+      on te.employee_id = e.id
+      and te.clock_in >= now() - interval '30 days'
+    group by e.id, e.name
+  )
+  select case
+    when not arise_pin_matches(input_pin) then jsonb_build_object('ok', false, 'error', 'Wrong PIN')
+    else jsonb_build_object(
+      'ok', true,
+      'employees', coalesce((select jsonb_agg(arise_employee_json(e) order by e.name) from employees e), '[]'::jsonb),
+      'totals', coalesce((select jsonb_agg(jsonb_build_object(
+        'employeeId', id,
+        'name', name,
+        'hours30Days', hours_30_days,
+        'clockedIn', clocked_in
+      ) order by name) from employee_totals), '[]'::jsonb),
+      'entries', coalesce((select jsonb_agg(jsonb_build_object(
+        'id', id,
+        'employeeId', employee_id,
+        'employeeName', employee_name,
+        'clockIn', clock_in,
+        'clockOut', clock_out,
+        'hours', case
+          when clock_out is null then null
+          else round((extract(epoch from (clock_out - clock_in)) / 3600.0)::numeric, 2)
+        end
+      ) order by clock_in desc) from recent_entries), '[]'::jsonb)
+    )
+  end;
+$$;
+
+drop function if exists arise_save_employee(text, jsonb);
+create or replace function arise_save_employee(input_pin text, input_employee jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  saved_employee employees;
+  target_id uuid;
+begin
+  if not arise_pin_matches(input_pin) then
+    return jsonb_build_object('ok', false, 'error', 'Wrong PIN');
+  end if;
+
+  if length(trim(coalesce(input_employee->>'name', ''))) < 2 then
+    return jsonb_build_object('ok', false, 'error', 'Employee name is required');
+  end if;
+
+  if length(trim(coalesce(input_employee->>'pin', ''))) < 4 then
+    return jsonb_build_object('ok', false, 'error', 'Employee PIN must be at least 4 digits');
+  end if;
+
+  if coalesce(input_employee->>'id', '') <> '' then
+    target_id := (input_employee->>'id')::uuid;
+  end if;
+
+  if target_id is null then
+    insert into employees (name, pin, active)
+    values (
+      left(trim(input_employee->>'name'), 80),
+      left(trim(input_employee->>'pin'), 20),
+      coalesce((input_employee->>'active')::boolean, true)
+    )
+    returning * into saved_employee;
+  else
+    update employees
+    set
+      name = left(trim(input_employee->>'name'), 80),
+      pin = left(trim(input_employee->>'pin'), 20),
+      active = coalesce((input_employee->>'active')::boolean, active)
+    where id = target_id
+    returning * into saved_employee;
+  end if;
+
+  return jsonb_build_object('ok', true, 'employee', arise_employee_json(saved_employee));
+exception
+  when unique_violation then
+    return jsonb_build_object('ok', false, 'error', 'That PIN is already used');
+end;
+$$;
+
+drop function if exists arise_toggle_employee(text, text, boolean);
+create or replace function arise_toggle_employee(input_pin text, input_employee_id text, input_active boolean)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  saved_employee employees;
+begin
+  if not arise_pin_matches(input_pin) then
+    return jsonb_build_object('ok', false, 'error', 'Wrong PIN');
+  end if;
+
+  update employees
+  set active = input_active
+  where id::text = input_employee_id
+  returning * into saved_employee;
+
+  if saved_employee is null then
+    return jsonb_build_object('ok', false, 'error', 'Employee not found');
+  end if;
+
+  return jsonb_build_object('ok', true, 'employee', arise_employee_json(saved_employee));
+end;
+$$;

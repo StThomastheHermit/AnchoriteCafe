@@ -280,6 +280,16 @@ function formatUpdatedAt(value) {
   return value.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
+function formatShiftTime(value) {
+  if (!value) return "Still clocked in";
+  return new Date(value).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function formatHours(value) {
+  const hours = Number(value || 0);
+  return `${hours.toFixed(2)} hr`;
+}
+
 function TextSizeControl({ largeText, onChange }) {
   return (
     <button
@@ -434,6 +444,10 @@ function AdminPage() {
   const [analyticsLoaded, setAnalyticsLoaded] = useState(false);
   const [analyticsWeekOffset, setAnalyticsWeekOffset] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [timeClock, setTimeClock] = useState({ employees: [], entries: [], totals: [] });
+  const [timeClockLoaded, setTimeClockLoaded] = useState(false);
+  const [timeClockBusy, setTimeClockBusy] = useState(false);
+  const [employeeDraft, setEmployeeDraft] = useState({ name: "", pin: "" });
   const [adminView, setAdminView] = useState("dashboard");
   const [menuLoaded, setMenuLoaded] = useState(false);
   const [menuDrinks, setMenuDrinks] = useState(() => normalizeMenuDrinks(DRINKS, true));
@@ -692,6 +706,66 @@ function AdminPage() {
     setAnalyticsOpen(true);
     setAdminView("analytics");
     if (!analyticsLoaded) await loadAnalytics();
+  }
+
+  async function loadTimeClock() {
+    setTimeClockBusy(true);
+    try {
+      const data = await apiPost({ action: "timeClockAdmin", pin });
+      if (data.ok) {
+        setTimeClock({
+          employees: Array.isArray(data.employees) ? data.employees : [],
+          entries: Array.isArray(data.entries) ? data.entries : [],
+          totals: Array.isArray(data.totals) ? data.totals : [],
+        });
+        setTimeClockLoaded(true);
+      } else {
+        alert(data.error || "Could not load time clock");
+      }
+    } catch {
+      alert("Connection error");
+    } finally {
+      setTimeClockBusy(false);
+    }
+  }
+
+  async function openTimeClockScreen() {
+    setAdminView("timeclock");
+    if (!timeClockLoaded) await loadTimeClock();
+  }
+
+  async function saveEmployee() {
+    if (!employeeDraft.name.trim() || !employeeDraft.pin.trim()) {
+      alert("Employee name and PIN are required.");
+      return;
+    }
+    setTimeClockBusy(true);
+    try {
+      const data = await apiPost({ action: "saveEmployee", pin, employee: { ...employeeDraft, active: true } });
+      if (data.ok) {
+        setEmployeeDraft({ name: "", pin: "" });
+        await loadTimeClock();
+      } else {
+        alert(data.error || "Could not save employee");
+      }
+    } catch {
+      alert("Connection error");
+    } finally {
+      setTimeClockBusy(false);
+    }
+  }
+
+  async function toggleEmployee(employee) {
+    setTimeClockBusy(true);
+    try {
+      const data = await apiPost({ action: "toggleEmployee", pin, employeeId: employee.id, active: employee.active === false });
+      if (data.ok) await loadTimeClock();
+      else alert(data.error || "Could not update employee");
+    } catch {
+      alert("Connection error");
+    } finally {
+      setTimeClockBusy(false);
+    }
   }
 
   function formatWeekRange(start, end) {
@@ -1028,6 +1102,75 @@ function AdminPage() {
     );
   }
 
+  if (adminView === "timeclock") {
+    const totalsByEmployee = Object.fromEntries((timeClock.totals || []).map(total => [total.employeeId, total]));
+    return (
+      <>
+        <Header isOpen={isOpen} />
+        <main className="adminPage">
+          <section className="adminTop">
+            <div>
+              <h2>Time Clock</h2>
+              <p className="sub">Employee PIN clock-in and clock-out with calculated hours.</p>
+            </div>
+            <div className="adminTopActions">
+              <button className="ghostBtn" disabled={timeClockBusy} onClick={loadTimeClock}>Refresh</button>
+              <button className="ghostBtn" onClick={() => setAdminView("dashboard")}>Back to dashboard</button>
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="sectionHeader">
+              <div>
+                <h2>Employees</h2>
+                <p className="sub">Give each person a unique PIN for `/clock`.</p>
+              </div>
+            </div>
+            <div className="employeeForm">
+              <input value={employeeDraft.name} onChange={e => setEmployeeDraft(draft => ({ ...draft, name: e.target.value }))} placeholder="Employee name" />
+              <input value={employeeDraft.pin} onChange={e => setEmployeeDraft(draft => ({ ...draft, pin: e.target.value.replace(/\D/g, "").slice(0, 8) }))} placeholder="PIN" inputMode="numeric" />
+              <button className="primaryBtn compactPrimary" disabled={timeClockBusy} onClick={saveEmployee}>Add employee</button>
+            </div>
+            <div className="employeeGrid">
+              {timeClock.employees.length === 0 ? <div className="empty smallEmpty">No employees yet.</div> : timeClock.employees.map(employee => {
+                const total = totalsByEmployee[employee.id] || {};
+                return (
+                  <div className={employee.active === false ? "employeeCard inactive" : "employeeCard"} key={employee.id}>
+                    <div>
+                      <strong>{employee.name}</strong>
+                      <p>PIN {employee.pin} · {formatHours(total.hours30Days)} last 30 days</p>
+                    </div>
+                    <span className={total.clockedIn ? "menuState active" : "menuState"}>{total.clockedIn ? "Clocked in" : "Out"}</span>
+                    <button className="ghostBtn" disabled={timeClockBusy} onClick={() => toggleEmployee(employee)}>{employee.active === false ? "Reactivate" : "Deactivate"}</button>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="sectionHeader">
+              <div>
+                <h2>Recent Shifts</h2>
+                <p className="sub">Completed shifts calculate hours automatically.</p>
+              </div>
+            </div>
+            <div className="timeEntryList">
+              {timeClock.entries.length === 0 ? <div className="empty smallEmpty">No shifts recorded.</div> : timeClock.entries.map(entry => (
+                <div className="timeEntry" key={entry.id}>
+                  <strong>{entry.employeeName}</strong>
+                  <span>{formatShiftTime(entry.clockIn)}</span>
+                  <span>{formatShiftTime(entry.clockOut)}</span>
+                  <em>{entry.clockOut ? formatHours(entry.hours) : "Open shift"}</em>
+                </div>
+              ))}
+            </div>
+          </section>
+        </main>
+      </>
+    );
+  }
+
   return (
     <>
       <Header isOpen={isOpen} />
@@ -1078,6 +1221,10 @@ function AdminPage() {
           <button className={analyticsOpen ? "toolTile active" : "toolTile"} onClick={toggleAnalytics}>
             <strong>Analytics</strong>
             <span>Popular items</span>
+          </button>
+          <button className={adminView === "timeclock" ? "toolTile active" : "toolTile"} onClick={openTimeClockScreen}>
+            <strong>Time Clock</strong>
+            <span>Employee hours</span>
           </button>
         </section>
 
@@ -2370,8 +2517,66 @@ function DisplayPage() {
   );
 }
 
+function EmployeeClockPage() {
+  const [pin, setPin] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+
+  async function submitClock() {
+    if (pin.trim().length < 4 || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const data = await apiPost({ action: "timeClock", employeePin: pin });
+      if (data.ok) {
+        setResult(data);
+        setPin("");
+      } else {
+        setError(data.error || "Could not clock in or out");
+      }
+    } catch {
+      setError("Connection error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <Header isOpen={true} statusText="Time Clock" />
+      <main className="pinPage clockPage">
+        <section className="modal pinModal static clockCard">
+          <h2>Employee Time Clock</h2>
+          <p>Enter your personal PIN to clock in or clock out.</p>
+          <input
+            value={pin}
+            onChange={e => setPin(e.target.value.replace(/\D/g, "").slice(0, 8))}
+            onKeyDown={event => {
+              if (event.key === "Enter") submitClock();
+            }}
+            inputMode="numeric"
+            placeholder="Employee PIN"
+          />
+          {error && <div className="errorText">{error}</div>}
+          <button className="joinBtn" disabled={busy || pin.length < 4} onClick={submitClock}>{busy ? "Checking..." : "Clock In / Out"}</button>
+          {result?.ok && (
+            <div className={result.action === "clocked_in" ? "clockResult in" : "clockResult out"}>
+              <strong>{result.employee?.name}</strong>
+              <span>{result.action === "clocked_in" ? "Clocked in" : "Clocked out"}</span>
+              <p>{result.action === "clocked_in" ? formatShiftTime(result.entry?.clockIn) : `${formatHours(result.entry?.hours)} worked`}</p>
+            </div>
+          )}
+          <a className="adminMetaLink clockAdminLink" href="/admin">Admin</a>
+        </section>
+      </main>
+    </>
+  );
+}
+
 function App() {
   const path = window.location.pathname.toLowerCase();
+  if (path.startsWith("/clock") || path.startsWith("/timeclock")) return <EmployeeClockPage />;
   if (path.startsWith("/display") || path.startsWith("/tv")) return <DisplayPage />;
   return path.startsWith("/admin") ? <AdminPage /> : <CustomerPage />;
 }

@@ -43,6 +43,10 @@ export async function apiPost(payload) {
   if (payload.action === "archive") return getArchive(payload.pin);
   if (payload.action === "clearArchive") return clearArchive(payload.pin);
   if (payload.action === "analytics") return getAnalytics(payload.pin, payload.weekOffset);
+  if (payload.action === "timeClock") return timeClock(payload.employeePin);
+  if (payload.action === "timeClockAdmin") return getTimeClockAdmin(payload.pin);
+  if (payload.action === "saveEmployee") return saveEmployee(payload.pin, payload.employee);
+  if (payload.action === "toggleEmployee") return toggleEmployee(payload.pin, payload.employeeId, payload.active);
   if (payload.action === "saveMenu") return saveMenu(payload.pin, {
     drinks: payload.drinks,
     milks: payload.milks,
@@ -50,6 +54,45 @@ export async function apiPost(payload) {
   });
 
   return { ok: false, error: "Unknown action" };
+}
+
+export async function timeClock(employeePin) {
+  try {
+    return await callRpc("arise_time_clock", { input_employee_pin: String(employeePin || "") });
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) };
+  }
+}
+
+export async function getTimeClockAdmin(pin) {
+  try {
+    return await callRpc("arise_time_clock_admin", { input_pin: String(pin || "") });
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) };
+  }
+}
+
+export async function saveEmployee(pin, employee) {
+  try {
+    return await callRpc("arise_save_employee", {
+      input_pin: String(pin || ""),
+      input_employee: employee || {},
+    });
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) };
+  }
+}
+
+export async function toggleEmployee(pin, employeeId, active) {
+  try {
+    return await callRpc("arise_toggle_employee", {
+      input_pin: String(pin || ""),
+      input_employee_id: employeeId ? String(employeeId) : null,
+      input_active: active !== false,
+    });
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) };
+  }
 }
 
 export async function login(pin) {
