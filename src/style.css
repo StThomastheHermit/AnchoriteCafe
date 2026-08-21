@@ -16,7 +16,6 @@ header h1,h2,.modal h2{font-family:"Playfair Display",Georgia,serif;font-weight:
 header h1{font-size:19px}
 header p{font-size:10px;color:#5A3A20;letter-spacing:1.5px;text-transform:uppercase}
 .adminLink{color:#FFF8F0;font-size:12px;font-weight:700;border:1px solid rgba(200,130,58,.35);background:#2C1400;border-radius:4px;padding:8px 10px;white-space:nowrap;margin-left:10px}
-.staffClockLink{background:rgba(155,170,120,.16)!important;border-color:rgba(155,170,120,.42)!important;color:#FFF6E8!important}
 .pill{margin-left:4px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600}
 .pill.open{background:rgba(107,191,107,.12);color:#6BBF6B;border:1px solid rgba(107,191,107,.3)}
 .pill.closed{background:rgba(224,82,82,.12);color:#E05252;border:1px solid rgba(224,82,82,.3)}
@@ -100,6 +99,11 @@ input:focus,textarea:focus{outline:2px solid #C8823A}
 .clockResult.out span{color:var(--gold)}
 .clockResult p{color:var(--muted);font-size:12px;margin-top:4px}
 .clockAdminLink{align-self:center;margin-top:2px}
+.employeeTimesheet{border:1px solid var(--line);border-radius:12px;background:rgba(255,246,232,.06);padding:12px;text-align:left}
+.timesheetHead{display:flex;justify-content:space-between;gap:10px;margin-bottom:8px}
+.timesheetHead span{color:var(--gold);font-size:12px;font-weight:800}
+.employeeShift{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;border-top:1px solid rgba(201,154,109,.16);padding:8px 0;color:var(--muted);font-size:11px}
+.employeeShift strong{color:var(--text)}
 
 .empty{color:#4A3020;text-align:center;padding:44px 20px;border:1px dashed rgba(200,130,58,.12);border-radius:8px}
 .empty div{font-size:30px;opacity:.25;margin-bottom:10px}
@@ -1069,7 +1073,7 @@ input:focus,textarea:focus{
   header{
     flex-wrap:wrap;
   }
-  .employeeForm,.timeEntry{grid-template-columns:1fr}
+  .employeeForm,.timeEntry,.employeeShift{grid-template-columns:1fr}
   .brand{
     flex:1 1 100%;
   }

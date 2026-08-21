@@ -333,14 +333,12 @@ function ringReadyAlert() {
 function Header({ isOpen, statusText }) {
   const path = window.location.pathname.toLowerCase();
   const isAdminPage = path.startsWith("/admin");
-  const isClockPage = path.startsWith("/clock") || path.startsWith("/timeclock");
   return (
     <header>
       <a className="brand" href="/">
         <span><img src="/icons/anchorite-icon-192.png" alt="" /></span>
         <div><h1>Anchorite Cafe</h1><p>Faith fueled soul rooted</p></div>
       </a>
-      {!isClockPage && <a className="adminLink staffClockLink" href="/clock">Staff Clock</a>}
       {!isAdminPage && <a className="adminLink" href="/admin">Admin Access</a>}
       <div className={isOpen ? "pill open" : "pill closed"}>{statusText || (isOpen ? "● Open" : "● Closed")}</div>
     </header>
@@ -2601,11 +2599,28 @@ function EmployeeClockPage() {
           {error && <div className="errorText">{error}</div>}
           <button className="joinBtn" disabled={busy || pin.length < 4} onClick={submitClock}>{busy ? "Checking..." : "Clock In / Out"}</button>
           {result?.ok && (
-            <div className={result.action === "clocked_in" ? "clockResult in" : "clockResult out"}>
-              <strong>{result.employee?.name}</strong>
-              <span>{result.action === "clocked_in" ? "Clocked in" : "Clocked out"}</span>
-              <p>{result.action === "clocked_in" ? formatShiftTime(result.entry?.clockIn) : `${formatHours(result.entry?.hours)} worked`}</p>
-            </div>
+            <>
+              <div className={result.action === "clocked_in" ? "clockResult in" : "clockResult out"}>
+                <strong>{result.employee?.name}</strong>
+                <span>{result.action === "clocked_in" ? "Clocked in" : "Clocked out"}</span>
+                <p>{result.action === "clocked_in" ? formatShiftTime(result.entry?.clockIn) : `${formatHours(result.entry?.hours)} worked`}</p>
+              </div>
+              <div className="employeeTimesheet">
+                <div className="timesheetHead">
+                  <strong>Your Timesheet</strong>
+                  <span>{formatHours(result.totalHours30Days)} last 30 days</span>
+                </div>
+                {(result.entries || []).length === 0 ? (
+                  <p className="muted">No previous shifts yet.</p>
+                ) : result.entries.map(entry => (
+                  <div className="employeeShift" key={entry.id}>
+                    <span>{formatShiftTime(entry.clockIn)}</span>
+                    <span>{formatShiftTime(entry.clockOut)}</span>
+                    <strong>{entry.clockOut ? formatHours(entry.hours) : "Open"}</strong>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
           <a className="adminMetaLink clockAdminLink" href="/admin">Admin</a>
         </section>

@@ -1230,6 +1230,8 @@ declare
   found_employee employees;
   open_entry time_entries;
   saved_entry time_entries;
+  employee_entries jsonb;
+  total_hours numeric;
 begin
   select *
   into found_employee
@@ -1255,11 +1257,30 @@ begin
     values (found_employee.id, now())
     returning * into saved_entry;
 
+    select coalesce(jsonb_agg(arise_time_entry_json(entry_row) order by entry_row.clock_in desc), '[]'::jsonb)
+    into employee_entries
+    from (
+      select *
+      from time_entries
+      where employee_id = found_employee.id
+        and clock_in >= now() - interval '30 days'
+      order by clock_in desc
+      limit 20
+    ) entry_row;
+
+    select coalesce(round(sum(extract(epoch from (coalesce(clock_out, now()) - clock_in)) / 3600.0)::numeric, 2), 0)
+    into total_hours
+    from time_entries
+    where employee_id = found_employee.id
+      and clock_in >= now() - interval '30 days';
+
     return jsonb_build_object(
       'ok', true,
       'action', 'clocked_in',
       'employee', arise_employee_json(found_employee),
-      'entry', arise_time_entry_json(saved_entry)
+      'entry', arise_time_entry_json(saved_entry),
+      'entries', employee_entries,
+      'totalHours30Days', total_hours
     );
   end if;
 
@@ -1268,11 +1289,30 @@ begin
   where id = open_entry.id
   returning * into saved_entry;
 
+  select coalesce(jsonb_agg(arise_time_entry_json(entry_row) order by entry_row.clock_in desc), '[]'::jsonb)
+  into employee_entries
+  from (
+    select *
+    from time_entries
+    where employee_id = found_employee.id
+      and clock_in >= now() - interval '30 days'
+    order by clock_in desc
+    limit 20
+  ) entry_row;
+
+  select coalesce(round(sum(extract(epoch from (coalesce(clock_out, now()) - clock_in)) / 3600.0)::numeric, 2), 0)
+  into total_hours
+  from time_entries
+  where employee_id = found_employee.id
+    and clock_in >= now() - interval '30 days';
+
   return jsonb_build_object(
     'ok', true,
     'action', 'clocked_out',
     'employee', arise_employee_json(found_employee),
-    'entry', arise_time_entry_json(saved_entry)
+    'entry', arise_time_entry_json(saved_entry),
+    'entries', employee_entries,
+    'totalHours30Days', total_hours
   );
 end;
 $$;
