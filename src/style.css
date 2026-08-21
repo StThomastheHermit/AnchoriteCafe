@@ -254,7 +254,7 @@ input:focus,textarea:focus{outline:2px solid #C8823A}
 .analyticsRow:first-of-type{border-top:none}
 .analyticsRow strong{color:#C8823A}
 .financeTable{display:grid;gap:8px}
-.financeRow{display:grid;grid-template-columns:1.4fr .9fr .8fr .8fr .7fr .8fr;gap:8px;align-items:center;background:#2C1400;border:1px solid rgba(200,130,58,.14);border-radius:8px;padding:10px;color:var(--muted);font-size:12px}
+.financeRow{display:grid;grid-template-columns:1.4fr .9fr .75fr .75fr .75fr .65fr .75fr .75fr;gap:8px;align-items:center;background:#2C1400;border:1px solid rgba(200,130,58,.14);border-radius:8px;padding:10px;color:var(--muted);font-size:12px}
 .financeRow strong{color:var(--text)}
 .financeRow input{width:100%;min-width:0;background:#1C0A00;border:1px solid rgba(200,130,58,.25);border-radius:6px;color:var(--text);padding:8px}
 .financeHead{background:transparent;border:none;color:var(--gold);font-weight:800;padding-block:0}

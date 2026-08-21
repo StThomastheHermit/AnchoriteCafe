@@ -19,6 +19,9 @@ const MENU_CATEGORIES = [
   { id: "refresher", label: "Refreshers" },
   { id: "smoothie", label: "Smoothies" },
   { id: "drink", label: "Soda / Water / Juice" },
+  { id: "small-snack", label: "Small Snacks" },
+  { id: "big-snack", label: "Big Snacks" },
+  { id: "light-meal", label: "Light Meals" },
 ];
 
 const MENU_PRICES = {
@@ -26,6 +29,9 @@ const MENU_PRICES = {
   refresher: 5,
   smoothie: 5,
   drink: 3,
+  "small-snack": 1,
+  "big-snack": 2,
+  "light-meal": 3,
 };
 
 const DRINKS = [
@@ -41,6 +47,9 @@ const DRINKS = [
   { id: "water", label: "Water", desc: "Bottled water", category: "drink", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
   { id: "soda", label: "Soda", desc: "Canned soda", category: "drink", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
   { id: "juice", label: "Juice", desc: "Bottled juice", category: "drink", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
+  { id: "small-snack", label: "Small Snack", desc: "Small snack item", category: "small-snack", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
+  { id: "big-snack", label: "Big Snack", desc: "Big snack item", category: "big-snack", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
+  { id: "light-meal", label: "Light Meal", desc: "Light meal item", category: "light-meal", temps: ["Cold"], milk: false, syrups: false, showTemp: false },
 ];
 
 const MILKS = ["Whole milk", "Almond milk", "Oat milk", "Soy milk"];
@@ -84,12 +93,19 @@ function normalizeDrinkCategory(drink) {
   const text = `${drink?.id || ""} ${drink?.label || ""}`.toLowerCase();
   if (text.includes("refresh")) return "refresher";
   if (text.includes("smoothie")) return "smoothie";
+  if (text.includes("small snack")) return "small-snack";
+  if (text.includes("big snack")) return "big-snack";
+  if (text.includes("light meal")) return "light-meal";
   if (text.includes("soda") || text.includes("water") || text.includes("juice")) return "drink";
   return "coffee";
 }
 
 function priceForCategory(category) {
   return MENU_PRICES[category] || 5;
+}
+
+function categoryCanHaveIce(category) {
+  return ["coffee", "refresher", "smoothie", "drink"].includes(category);
 }
 
 function formatPrice(amount) {
@@ -99,6 +115,10 @@ function formatPrice(amount) {
 function formatCount(amount) {
   const value = Number(amount || 0);
   return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, "");
+}
+
+function formatCurrency(amount) {
+  return `$${Number(amount || 0).toFixed(2)}`;
 }
 
 function normalizeMenuDrinks(drinks, includeInactive = false) {
@@ -1253,7 +1273,7 @@ function AdminPage() {
                 <div key={total.category}>
                   <span>{total.category}</span>
                   <strong>{formatCount(total.used)} used</strong>
-                  <em>{formatCount(total.capacity)} capacity</em>
+                  <em>{formatCount(total.capacity)} capacity · {formatCurrency(total.remainingValue)} left</em>
                 </div>
               ))}
             </div>
@@ -1264,8 +1284,10 @@ function AdminPage() {
                 <span>Type</span>
                 <span>On hand</span>
                 <span>Serves/unit</span>
+                <span>Cost/unit</span>
                 <span>Used</span>
                 <span>Remaining</span>
+                <span>Value left</span>
               </div>
               {financeBusy && !finance.items.length ? (
                 <div className="empty smallEmpty">Loading finance...</div>
@@ -1285,8 +1307,14 @@ function AdminPage() {
                     onChange={e => updateFinanceItem(item.id, { servingsPerUnit: e.target.value })}
                     inputMode="decimal"
                   />
+                  <input
+                    value={item.unitCost ?? 0}
+                    onChange={e => updateFinanceItem(item.id, { unitCost: e.target.value })}
+                    inputMode="decimal"
+                  />
                   <span>{formatCount(item.usedServings)}</span>
                   <span className={Number(item.remainingServings || 0) <= 5 ? "financeLow" : ""}>{formatCount(item.remainingServings)}</span>
+                  <span>{formatCurrency(item.remainingValue)}</span>
                 </div>
               ))}
             </div>
@@ -2061,7 +2089,7 @@ function CustomerPage() {
       milk: pending?.milk || "",
       syrups: pending?.syrups || [],
       toppings: pending?.toppings || [],
-      lightIce: nextTemp === "Cold" && Boolean(pending?.lightIce),
+      lightIce: categoryCanHaveIce(d.category) && nextTemp === "Cold" && Boolean(pending?.lightIce),
       notes: pending?.notes ?? f.notes,
     }));
     setErrors({});
@@ -2119,7 +2147,7 @@ function CustomerPage() {
       milk: drink.milk ? form.milk : "",
       syrups: drink.syrups ? form.syrups : [],
       toppings,
-      lightIce: temp === "Cold" && form.lightIce,
+      lightIce: categoryCanHaveIce(drink.category) && temp === "Cold" && form.lightIce,
       price: priceForCategory(drink.category),
       notes: form.notes.trim(),
     };
@@ -2205,7 +2233,7 @@ function CustomerPage() {
       ? lastOrder.syrups.filter(s => isInventoryAvailable(inventoryLookup, s)).slice(0, MAX_SYRUPS)
       : [];
 
-    pendingLastOrderRef.current = { temp: nextTemp, milk: nextMilk, syrups: nextSyrups, lightIce: nextTemp === "Cold" && Boolean(lastOrder.lightIce), notes: lastOrder.notes || "" };
+    pendingLastOrderRef.current = { temp: nextTemp, milk: nextMilk, syrups: nextSyrups, lightIce: categoryCanHaveIce(savedDrink.category) && nextTemp === "Cold" && Boolean(lastOrder.lightIce), notes: lastOrder.notes || "" };
     setForm(f => ({ ...f, drinkId: savedDrink.id }));
     setErrors({});
   }
@@ -2419,7 +2447,7 @@ function CustomerPage() {
                 </div>
               ) : <div className="servedOnly">Served <strong>{drink.temps[0].toLowerCase()}</strong> only</div>)}
 
-              {(drink.showTemp === false ? drink.temps[0] : form.temp) === "Cold" && (
+              {categoryCanHaveIce(drink.category) && (drink.showTemp === false ? drink.temps[0] : form.temp) === "Cold" && (
                 <div className="field">
                   {lbl("Ice")}
                   <div className="row">

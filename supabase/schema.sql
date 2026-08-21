@@ -118,6 +118,7 @@ create table if not exists finance_items (
   category text not null default 'Supply',
   units_on_hand numeric not null default 0,
   servings_per_unit numeric not null default 1,
+  unit_cost numeric not null default 0,
   active boolean not null default true,
   sort_order integer not null default 0,
   updated_at timestamptz not null default now()
@@ -127,6 +128,7 @@ alter table finance_items add column if not exists item text;
 alter table finance_items add column if not exists category text not null default 'Supply';
 alter table finance_items add column if not exists units_on_hand numeric not null default 0;
 alter table finance_items add column if not exists servings_per_unit numeric not null default 1;
+alter table finance_items add column if not exists unit_cost numeric not null default 0;
 alter table finance_items add column if not exists active boolean not null default true;
 alter table finance_items add column if not exists sort_order integer not null default 0;
 alter table finance_items add column if not exists updated_at timestamptz not null default now();
@@ -141,18 +143,26 @@ alter table archived_orders add column if not exists syrups text;
 alter table archived_orders add column if not exists notes text;
 alter table archived_orders add column if not exists status text;
 
-insert into finance_items (id, item, category, units_on_hand, servings_per_unit, active, sort_order) values
-('espresso-beans','Espresso beans','Coffee',0,60,true,0),
-('whole-milk','Whole milk','Milk',0,16,true,1),
-('almond-milk','Almond milk','Milk',0,16,true,2),
-('oat-milk','Oat milk','Milk',0,16,true,3),
-('soy-milk','Soy milk','Milk',0,16,true,4),
-('juice-concentrate','Juice concentrate','Juice',0,60,true,5),
-('soda-cans','Soda cans','Soda',0,1,true,6),
-('water-bottles','Water bottles','Water',0,1,true,7),
-('refresher-base','Refresher base','Refreshers',0,60,true,8),
-('smoothie-mix','Smoothie mix','Smoothies',0,30,true,9)
+insert into finance_items (id, item, category, units_on_hand, servings_per_unit, unit_cost, active, sort_order) values
+('espresso-beans','Espresso beans','Coffee',0,60,0,true,0),
+('whole-milk','Whole milk','Milk',0,16,0,true,1),
+('almond-milk','Almond milk','Milk',0,16,0,true,2),
+('oat-milk','Oat milk','Milk',0,16,0,true,3),
+('soy-milk','Soy milk','Milk',0,16,0,true,4),
+('juice-bottles','Juice bottles','Juice',0,1,0,true,5),
+('juice-boxes','Juice boxes','Juice',0,1,0,true,6),
+('soda-cans','Soda cans','Soda',0,1,0,true,7),
+('water-bottles','Water bottles','Water',0,1,0,true,8),
+('refresher-base','Refresher base','Refreshers',0,60,0,true,9),
+('smoothie-mix','Smoothie mix','Smoothies',0,30,0,true,10),
+('small-snacks','Small snacks','Small Snacks',0,1,0,true,11),
+('big-snacks','Big snacks','Big Snacks',0,1,0,true,12),
+('light-meals','Light meals','Light Meals',0,1,0,true,13)
 on conflict (id) do nothing;
+
+update finance_items
+set active = false
+where id = 'juice-concentrate';
 
 insert into inventory (item, type, available) values
 ('Caramel','syrup',true),
@@ -211,7 +221,10 @@ insert into menu_drinks (id, label, description, category, temps, has_milk, has_
 ('mango-smoothie','Mango Smoothie','Blended smoothie','smoothie',array['Cold'],false,false,false,true,8),
 ('water','Water','Bottled water','drink',array['Cold'],false,false,false,true,9),
 ('soda','Soda','Canned soda','drink',array['Cold'],false,false,false,true,10),
-('juice','Juice','Bottled juice','drink',array['Cold'],false,false,false,true,11)
+('juice','Juice','Bottled juice','drink',array['Cold'],false,false,false,true,11),
+('small-snack','Small Snack','Small snack item','small-snack',array['Cold'],false,false,false,true,12),
+('big-snack','Big Snack','Big snack item','big-snack',array['Cold'],false,false,false,true,13),
+('light-meal','Light Meal','Light meal item','light-meal',array['Cold'],false,false,false,true,14)
 on conflict (id) do nothing;
 
 insert into settings (key, value) values
@@ -823,7 +836,7 @@ begin
       left(coalesce(nullif(trim(drink_item->>'label'), ''), 'Drink'), 80),
       left(coalesce(drink_item->>'desc', ''), 180),
       case
-        when lower(coalesce(drink_item->>'category', 'coffee')) in ('coffee', 'refresher', 'smoothie', 'drink') then lower(coalesce(drink_item->>'category', 'coffee'))
+        when lower(coalesce(drink_item->>'category', 'coffee')) in ('coffee', 'refresher', 'smoothie', 'drink', 'small-snack', 'big-snack', 'light-meal') then lower(coalesce(drink_item->>'category', 'coffee'))
         else 'coffee'
       end,
       cleaned_temps,
@@ -1154,6 +1167,8 @@ as $$
       and lower(coalesce(drink, '')) not like '%juice%'
       and lower(coalesce(drink, '')) not like '%refresher%'
       and lower(coalesce(drink, '')) not like '%smoothie%'
+      and lower(coalesce(drink, '')) not like '%snack%'
+      and lower(coalesce(drink, '')) not like '%meal%'
     union all
     select 'whole-milk', count(*)::numeric from archived_orders where lower(coalesce(milk, '')) = 'whole milk'
     union all
@@ -1163,7 +1178,10 @@ as $$
     union all
     select 'soy-milk', count(*)::numeric from archived_orders where lower(coalesce(milk, '')) = 'soy milk'
     union all
-    select 'juice-concentrate', count(*)::numeric from archived_orders where lower(coalesce(drink, '')) like '%juice%'
+    select 'juice-bottles', count(*)::numeric from archived_orders where lower(coalesce(drink, '')) like '%juice% bottle%'
+      or lower(coalesce(drink, '')) = 'juice'
+    union all
+    select 'juice-boxes', count(*)::numeric from archived_orders where lower(coalesce(drink, '')) like '%juice box%'
     union all
     select 'soda-cans', count(*)::numeric from archived_orders where lower(coalesce(drink, '')) like '%soda%'
     union all
@@ -1172,12 +1190,22 @@ as $$
     select 'refresher-base', count(*)::numeric from archived_orders where lower(coalesce(drink, '')) like '%refresher%'
     union all
     select 'smoothie-mix', count(*)::numeric from archived_orders where lower(coalesce(drink, '')) like '%smoothie%'
+    union all
+    select 'small-snacks', count(*)::numeric from archived_orders where lower(coalesce(drink, '')) like '%small snack%'
+    union all
+    select 'big-snacks', count(*)::numeric from archived_orders where lower(coalesce(drink, '')) like '%big snack%'
+    union all
+    select 'light-meals', count(*)::numeric from archived_orders where lower(coalesce(drink, '')) like '%light meal%'
   ),
   item_rows as (
     select
       fi.*,
       coalesce(ur.used, 0) as used_servings,
-      greatest(0, (fi.units_on_hand * fi.servings_per_unit) - coalesce(ur.used, 0)) as remaining_servings
+      greatest(0, (fi.units_on_hand * fi.servings_per_unit) - coalesce(ur.used, 0)) as remaining_servings,
+      case
+        when fi.servings_per_unit <= 0 then 0
+        else greatest(0, (fi.units_on_hand * fi.servings_per_unit) - coalesce(ur.used, 0)) / fi.servings_per_unit * fi.unit_cost
+      end as remaining_value
     from finance_items fi
     left join usage_rows ur on ur.id = fi.id
     where fi.active
@@ -1187,7 +1215,8 @@ as $$
       category,
       sum(units_on_hand * servings_per_unit) as capacity,
       sum(used_servings) as used,
-      sum(remaining_servings) as remaining
+      sum(remaining_servings) as remaining,
+      sum(remaining_value) as remaining_value
     from item_rows
     group by category
   )
@@ -1201,15 +1230,18 @@ as $$
         'category', category,
         'unitsOnHand', units_on_hand,
         'servingsPerUnit', servings_per_unit,
+        'unitCost', unit_cost,
         'usedServings', used_servings,
         'remainingServings', remaining_servings,
+        'remainingValue', remaining_value,
         'sortOrder', sort_order
       ) order by sort_order, item) from item_rows), '[]'::jsonb),
       'totals', coalesce((select jsonb_agg(jsonb_build_object(
         'category', category,
         'capacity', capacity,
         'used', used,
-        'remaining', remaining
+        'remaining', remaining,
+        'remainingValue', remaining_value
       ) order by category) from totals), '[]'::jsonb)
     )
   end;
@@ -1241,6 +1273,7 @@ begin
     set
       units_on_hand = greatest(0, coalesce(nullif(supply_item->>'unitsOnHand', '')::numeric, 0)),
       servings_per_unit = greatest(0, coalesce(nullif(supply_item->>'servingsPerUnit', '')::numeric, 1)),
+      unit_cost = greatest(0, coalesce(nullif(supply_item->>'unitCost', '')::numeric, 0)),
       updated_at = now()
     where id = supply_item->>'id';
   end loop;
