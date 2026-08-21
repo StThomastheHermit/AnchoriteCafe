@@ -89,6 +89,11 @@ const THEME_PRESETS = [
     label: "Olive",
     colors: { bg: "#090805", surface: "#2B2114", surface2: "#43351F", text: "#FFF8E9", muted: "#DDC99E", gold: "#D9A441", red: "#B94736", green: "#BBC878", copper: "#AA6430" },
   },
+  {
+    id: "blue",
+    label: "Blue",
+    colors: { bg: "#061019", surface: "#102738", surface2: "#173B54", text: "#F4FBFF", muted: "#B8D3E3", gold: "#E1B35D", red: "#C94E45", green: "#9CBF9A", copper: "#B8794C" },
+  },
 ];
 const DEFAULT_THEME = THEME_PRESETS[0].colors;
 
@@ -590,6 +595,7 @@ function AdminPage() {
   const statusLoadingRef = useRef(false);
   const inventoryLoadingRef = useRef(false);
   const messageEditingRef = useRef(false);
+  const themeEditingRef = useRef(false);
   const adminSyrups = useMemo(() => inventoryItemsByType(inventory, "syrup", SYRUPS), [inventory]);
   const adminMilks = useMemo(() => inventoryItemsByType(inventory, "milk", MILKS), [inventory]);
   const adminToppings = useMemo(() => inventoryItemsByType(inventory, "topping", REFRESHER_TOPPINGS), [inventory]);
@@ -605,6 +611,7 @@ function AdminPage() {
 
   function syncTheme(nextTheme) {
     if (!nextTheme) return;
+    if (themeEditingRef.current) return;
     const normalized = normalizeTheme(nextTheme);
     setTheme(normalized);
     applyTheme(normalized);
@@ -1000,6 +1007,7 @@ function AdminPage() {
     try {
       const data = await apiPost({ action: "saveTheme", pin, theme: normalized });
       if (data.ok) {
+        themeEditingRef.current = false;
         syncTheme(data.theme || normalized);
         setNotice("Theme saved");
       } else {
@@ -1513,7 +1521,7 @@ function AdminPage() {
             </div>
             <div className="adminTopActions">
               <button className="primaryBtn compactPrimary" disabled={themeBusy} onClick={() => saveTheme()}>{themeBusy ? "Saving..." : "Save theme"}</button>
-              <button className="ghostBtn" onClick={() => setAdminView("dashboard")}>Back to dashboard</button>
+              <button className="ghostBtn" onClick={() => { themeEditingRef.current = false; setAdminView("dashboard"); }}>Back to dashboard</button>
             </div>
           </section>
 
@@ -1522,16 +1530,19 @@ function AdminPage() {
             busy={themeBusy}
             onChange={nextTheme => {
               const normalized = normalizeTheme(nextTheme);
+              themeEditingRef.current = true;
               setTheme(normalized);
               applyTheme(normalized);
             }}
             onPreset={preset => {
               const normalized = normalizeTheme(preset.colors);
+              themeEditingRef.current = true;
               setTheme(normalized);
               applyTheme(normalized);
             }}
             onReset={() => {
               const normalized = normalizeTheme(DEFAULT_THEME);
+              themeEditingRef.current = true;
               setTheme(normalized);
               applyTheme(normalized);
             }}
