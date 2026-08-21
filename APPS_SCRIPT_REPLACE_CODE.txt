@@ -1,0 +1,331 @@
+const SHEET_ORDERS = "Orders";
+const SHEET_SETTINGS = "Settings";
+const SHEET_ARCHIVE = "Archive";
+const SHEET_INVENTORY = "Inventory";
+
+const DEFAULT_SYRUPS = ["Caramel", "Sugar Free Caramel", "Vanilla", "Sugar Free Vanilla", "Mocha", "White Chocolate", "Honey", "Cinnamon Powder", "Hazelnut"];
+const DEFAULT_MILKS = ["Almond milk", "Oat milk", "Soy milk"];
+
+function getSS() {
+  return SpreadsheetApp.getActiveSpreadsheet();
+}
+
+function getSheet(name) {
+  return getSS().getSheetByName(name);
+}
+
+function getSettingsSheet() {
+  return getSheet(SHEET_SETTINGS);
+}
+
+function getSetting(name) {
+  const sheet = getSettingsSheet();
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]).trim() === name) return data[i][1];
+  }
+  return null;
+}
+
+function isQueueOpen() {
+  const value = getSetting("isOpen");
+  return value === true || String(value).toLowerCase() === "true";
+}
+
+function setSetting(name, value) {
+  const sheet = getSettingsSheet();
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]).trim() === name) {
+      sheet.getRange(i + 1, 2).setValue(value);
+      return;
+    }
+  }
+  sheet.appendRow([name, value]);
+}
+
+function ensureSheets() {
+  const ss = getSS();
+
+  let settings = ss.getSheetByName(SHEET_SETTINGS);
+  if (!settings) {
+    settings = ss.insertSheet(SHEET_SETTINGS);
+    settings.appendRow(["Key", "Value"]);
+    settings.appendRow(["isOpen", true]);
+    settings.appendRow(["message", ""]);
+    settings.appendRow(["pin", "1234"]);
+  }
+
+  let orders = ss.getSheetByName(SHEET_ORDERS);
+  if (!orders) orders = ss.insertSheet(SHEET_ORDERS);
+
+  if (orders.getLastRow() === 0) {
+    orders.appendRow(["Order ID", "Time", "Name", "Drink", "Temp", "Milk", "Syrups", "Notes", "Status"]);
+  } else {
+    const headers = orders.getRange(1, 1, 1, Math.max(orders.getLastColumn(), 9)).getValues()[0];
+    if (headers[0] !== "Order ID") {
+      orders.insertColumnBefore(1);
+      orders.getRange(1, 1).setValue("Order ID");
+    }
+    if (orders.getRange(1, 9).getValue() !== "Status") {
+      orders.getRange(1, 9).setValue("Status");
+    }
+  }
+
+  let archive = ss.getSheetByName(SHEET_ARCHIVE);
+  if (!archive) {
+    archive = ss.insertSheet(SHEET_ARCHIVE);
+    archive.appendRow(["Archived At", "Order ID", "Time", "Name", "Drink", "Temp", "Milk", "Syrups", "Notes", "Status"]);
+  }
+
+  let inventory = ss.getSheetByName(SHEET_INVENTORY);
+  if (!inventory) {
+    inventory = ss.insertSheet(SHEET_INVENTORY);
+    inventory.appendRow(["Item", "Type", "Available"]);
+    DEFAULT_SYRUPS.forEach(item => inventory.appendRow([item, "syrup", true]));
+    DEFAULT_MILKS.forEach(item => inventory.appendRow([item, "milk", true]));
+  }
+}
+
+function rowToOrder(row, rowNumber) {
+  const status = String(row[8] || "waiting").toLowerCase();
+  return {
+    row: rowNumber,
+    id: String(row[0] || ""),
+    time: row[1] instanceof Date ? row[1].toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : String(row[1] || ""),
+    name: String(row[2] || ""),
+    drink: String(row[3] || ""),
+    temp: String(row[4] || ""),
+    milk: String(row[5] || ""),
+    syrups: String(row[6] || ""),
+    notes: String(row[7] || ""),
+    status
+  };
+}
+
+function readOrders(includeComplete) {
+  ensureSheets();
+  const sheet = getSheet(SHEET_ORDERS);
+  const values = sheet.getDataRange().getValues();
+  const out = [];
+
+  for (let i = 1; i < values.length; i++) {
+    const order = rowToOrder(values[i], i + 1);
+    if (!includeComplete && order.status === "complete") continue;
+    out.push(order);
+  }
+
+  return out;
+}
+
+function readOrderWithPosition(id) {
+  const orders = readOrders(true);
+  const activeOrders = orders.filter(order => order.status !== "complete");
+  const order = orders.find(o => o.id === id) || null;
+  const activeIndex = order ? activeOrders.findIndex(o => o.id === order.id) : -1;
+  const position = activeIndex >= 0 ? activeIndex + 1 : 1;
+
+  return {
+    order,
+    position,
+    ordersAhead: Math.max(0, position - 1)
+  };
+}
+
+function readInventory() {
+  ensureSheets();
+  const sheet = getSheet(SHEET_INVENTORY);
+  const values = sheet.getDataRange().getValues();
+  const inventory = { syrups: [], milks: [] };
+
+  for (let i = 1; i < values.length; i++) {
+    const item = String(values[i][0] || "").trim();
+    const type = String(values[i][1] || "").trim().toLowerCase();
+    if (!item) continue;
+
+    const available = values[i][2] !== false && String(values[i][2]).toLowerCase() !== "false";
+    if (type === "milk") inventory.milks.push({ item, type: "milk", available });
+    if (type === "syrup") inventory.syrups.push({ item, type: "syrup", available });
+  }
+
+  if (!inventory.syrups.length) inventory.syrups = DEFAULT_SYRUPS.map(item => ({ item, type: "syrup", available: true }));
+  if (!inventory.milks.length) inventory.milks = DEFAULT_MILKS.map(item => ({ item, type: "milk", available: true }));
+
+  return inventory;
+}
+
+function doGet(e) {
+  ensureSheets();
+
+  const action = e && e.parameter && e.parameter.action;
+
+  if (action === "orders") {
+    return json({
+      ok: true,
+      isOpen: isQueueOpen(),
+      message: getSetting("message") || "",
+      orders: readOrders(false)
+    });
+  }
+
+  if (action === "order") {
+    const result = readOrderWithPosition(String(e.parameter.id || ""));
+    return json({
+      ok: true,
+      isOpen: isQueueOpen(),
+      message: getSetting("message") || "",
+      order: result.order,
+      position: result.position,
+      ordersAhead: result.ordersAhead
+    });
+  }
+
+  if (action === "inventory") {
+    return json({
+      ok: true,
+      inventory: readInventory()
+    });
+  }
+
+  return json({
+    ok: true,
+    isOpen: isQueueOpen(),
+    message: getSetting("message") || ""
+  });
+}
+
+function doPost(e) {
+  ensureSheets();
+
+  const data = JSON.parse(e.postData.contents);
+  const pin = String(getSetting("pin"));
+
+  if (data.action === "login") {
+    return json({ ok: String(data.pin) === pin });
+  }
+
+  if (data.action === "admin") {
+    if (String(data.pin) !== pin) return json({ ok: false, error: "Wrong PIN" });
+
+    if (typeof data.isOpen === "boolean") setSetting("isOpen", data.isOpen);
+    if (typeof data.message === "string") setSetting("message", data.message);
+
+    return json({
+      ok: true,
+      isOpen: isQueueOpen(),
+      message: getSetting("message") || ""
+    });
+  }
+
+  if (data.action === "order") {
+    if (!isQueueOpen()) {
+      return json({ ok: false, error: "Queue closed" });
+    }
+
+    const lock = LockService.getScriptLock();
+    lock.waitLock(5000);
+    try {
+      const sheet = getSheet(SHEET_ORDERS);
+      const id = "CQ-" + Date.now();
+      sheet.appendRow([
+        id,
+        new Date(),
+        data.name || "",
+        data.drink || "",
+        data.temp || "",
+        data.milk || "",
+        Array.isArray(data.syrups) ? data.syrups.join(", ") : "",
+        data.notes || "",
+        "waiting"
+      ]);
+
+      const result = readOrderWithPosition(id);
+      return json({ ok: true, id, position: result.position, ordersAhead: result.ordersAhead });
+    } finally {
+      lock.releaseLock();
+    }
+  }
+
+  if (data.action === "updateStatus") {
+    if (String(data.pin) !== pin) return json({ ok: false, error: "Wrong PIN" });
+
+    const status = String(data.status || "").toLowerCase();
+    if (!["waiting", "making", "ready", "complete"].includes(status)) {
+      return json({ ok: false, error: "Bad status" });
+    }
+
+    const sheet = getSheet(SHEET_ORDERS);
+    const values = sheet.getDataRange().getValues();
+
+    for (let i = 1; i < values.length; i++) {
+      if (String(values[i][0]) === String(data.id)) {
+        sheet.getRange(i + 1, 9).setValue(status);
+        values[i][8] = status;
+        return json({ ok: true, order: rowToOrder(values[i], i + 1) });
+      }
+    }
+
+    return json({ ok: false, error: "Order not found" });
+  }
+
+  if (data.action === "setInventory") {
+    if (String(data.pin) !== pin) return json({ ok: false, error: "Wrong PIN" });
+
+    const sheet = getSheet(SHEET_INVENTORY);
+    const values = sheet.getDataRange().getValues();
+    const item = String(data.item || "").trim();
+
+    for (let i = 1; i < values.length; i++) {
+      if (String(values[i][0]).trim() === item) {
+        sheet.getRange(i + 1, 3).setValue(data.available === true);
+        return json({ ok: true, inventory: readInventory() });
+      }
+    }
+
+    return json({ ok: false, error: "Inventory item not found" });
+  }
+
+  if (data.action === "clearCompleted") {
+    if (String(data.pin) !== pin) return json({ ok: false, error: "Wrong PIN" });
+    archiveAndDeleteRows(status => status === "complete");
+    return json({ ok: true, orders: readOrders(false) });
+  }
+
+  if (data.action === "clearAll") {
+    if (String(data.pin) !== pin) return json({ ok: false, error: "Wrong PIN" });
+
+    if (isQueueOpen()) {
+      return json({ ok: false, error: "Close the queue before clearing all orders" });
+    }
+
+    archiveAndDeleteRows(status => true);
+    return json({ ok: true, orders: readOrders(false) });
+  }
+
+  return json({ ok: false, error: "Unknown action" });
+}
+
+function archiveAndDeleteRows(matchFn) {
+  ensureSheets();
+
+  const orders = getSheet(SHEET_ORDERS);
+  const archive = getSheet(SHEET_ARCHIVE);
+  const values = orders.getDataRange().getValues();
+
+  const rowsToDelete = [];
+  for (let i = 1; i < values.length; i++) {
+    const status = String(values[i][8] || "waiting").toLowerCase();
+    if (matchFn(status)) {
+      archive.appendRow([new Date(), ...values[i]]);
+      rowsToDelete.push(i + 1);
+    }
+  }
+
+  rowsToDelete.reverse().forEach(row => orders.deleteRow(row));
+}
+
+function json(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
