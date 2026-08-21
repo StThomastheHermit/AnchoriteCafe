@@ -199,6 +199,9 @@ function applyTheme(theme) {
   root.style.setProperty("--green", colors.green);
   root.style.setProperty("--red", colors.red);
   root.style.setProperty("--copper", colors.copper);
+  root.style.setProperty("--tan", colors.muted);
+  root.style.setProperty("--line", `color-mix(in srgb, ${colors.gold} 28%, transparent)`);
+  root.style.setProperty("--line-strong", `color-mix(in srgb, ${colors.red} 62%, transparent)`);
 }
 
 function normalizeMenuDrinks(drinks, includeInactive = false) {
